@@ -202,9 +202,9 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
 
 ### Personne 1 : Pipeline CI - Structure et Job "test"
 
-#### Tâche 1 : Créer la structure du workflow CI
-- Créer le fichier `.github/workflows/ci.yml`
-- Configurer le workflow de base :
+#### ✅ Tâche 1 : Créer la structure du workflow CI
+- ✅ Créer le fichier `.github/workflows/ci.yml`
+- ✅ Configurer le workflow de base :
   - Nom : "CI"
   - Triggers : `push` sur `main`/`master` + trigger manuel (`workflow_dispatch`)
   - Permissions : `contents: read`, `security-events: write`, `actions: read`
