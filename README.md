@@ -200,9 +200,9 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
 
 ## Répartition des tâches CI/CD
 
-### Personne 1 : Pipeline CI - Structure et Job "test"
+### Pipeline CI - Structure et Job "test"
 
-#### ✅ Tâche 1 : Créer la structure du workflow CI
+#### Aya: Tâche 1 : Créer la structure du workflow CI
 - ✅ Créer le fichier `.github/workflows/ci.yml`
 - ✅ Configurer le workflow de base :
   - Nom : "CI"
