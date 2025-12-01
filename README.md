@@ -269,9 +269,9 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
 
 ### Personne 3 : Pipeline CD et Documentation (4 tâches)
 
-#### Tâche 1 : Créer le workflow CD
-- Créer le fichier `.github/workflows/cd.yml`
-- Configurer le workflow :
+#### ✅ Aya : Tâche 1 : Créer le workflow CD
+- ✅ Créer le fichier `.github/workflows/cd.yml`
+- ✅ Configurer le workflow :
   - Nom : "CD"
   - Trigger : `workflow_run` quand le workflow "CI" est complété
   - Condition : exécuter seulement si CI est réussi (`if: github.event.workflow_run.conclusion == 'success'`)
