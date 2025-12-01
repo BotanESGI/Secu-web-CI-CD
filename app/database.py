@@ -9,14 +9,19 @@ import os
 import sqlite3
 from typing import Any, Dict, List, Optional
 
-DEFAULT_DB_PATH = os.environ.get("CONTACTS_DB_PATH", "contacts.db")
+DEFAULT_DB_PATH = "contacts.db"
 
 
-def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
+def get_connection(db_path: str = None) -> sqlite3.Connection:
     """
     Retourne une connexion SQLite vers la base de données.
     Crée la base et la table si nécessaire.
+    
+    Si db_path n'est pas fourni, utilise CONTACTS_DB_PATH de l'environnement
+    ou "contacts.db" par défaut.
     """
+    if db_path is None:
+        db_path = os.environ.get("CONTACTS_DB_PATH", DEFAULT_DB_PATH)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     _init_schema(conn)
@@ -51,8 +56,7 @@ def create_contact(conn: sqlite3.Connection, name: str, email: str, phone: str =
     """
     cursor = conn.cursor()
 
-    # Échappement minimal des apostrophes pour éviter les erreurs de syntaxe,
-    # mais la requête reste non paramétrée et vulnérable aux injections SQL.
+   
     safe_name = name.replace("'", "''")
     safe_email = email.replace("'", "''")
     safe_phone = phone.replace("'", "''")

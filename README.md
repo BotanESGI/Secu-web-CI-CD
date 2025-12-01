@@ -50,19 +50,93 @@ Le module `app/database.py` est vulnérable à l’injection SQL pour les besoin
 
 ### Commandes pour tester avec Docker
 
-docker build -t contacts-vuln .Lancer les tests dans le conteneur :
+```bash
+# Construire l'image
+docker build -t contacts-vuln .
 
+# Lancer les tests dans le conteneur
 docker run --rm contacts-vuln
+```
+
 Si tout est correct, les tests de la base de données (`tests/test_database.py`) doivent passer (`5 passed`)
 
 ### Aya : Gestion des fichiers et Path Traversal
 
-- Implémenter la gestion des fichiers contacts
-  - Export/import de contacts en JSON/CSV
-  - Sauvegarde/restauration de données
-  - Path Traversal vulnérable (lecture/écriture sans validation)
-- Gestion des secrets en dur (tokens API, mots de passe dans le code)
-- Tests unitaires pour la gestion de fichiers (`tests/test_file_handler.py`)
+- ✅ Implémenter la gestion des fichiers contacts
+  - ✅ Export/import de contacts en JSON/CSV
+  - ✅ Sauvegarde/restauration de données
+  - ✅ Path Traversal vulnérable (lecture/écriture sans validation)
+- ✅ Gestion des secrets en dur (tokens API, mots de passe dans le code)
+- ✅ Tests unitaires pour la gestion de fichiers (`tests/test_file_handler.py`)
+
+#### Structure
+
+- `app/file_handler.py` : module de gestion des fichiers (export/import JSON/CSV, sauvegarde/restauration)
+- `app/config.py` : module de configuration avec secrets en dur (tokens API, mots de passe, clés)
+- `tests/test_file_handler.py` : tests unitaires pour la gestion des fichiers (9 tests)
+
+#### Fonctionnalités
+
+Le module `file_handler.py` fournit :
+
+- `export_contacts_json(output_path)` : exporte tous les contacts au format JSON
+- `export_contacts_csv(output_path)` : exporte tous les contacts au format CSV
+- `import_contacts_json(input_path)` : importe des contacts depuis un fichier JSON
+- `import_contacts_csv(input_path)` : importe des contacts depuis un fichier CSV
+- `save_backup(backup_path)` : sauvegarde la base de données complète dans un fichier JSON
+- `restore_backup(backup_path)` : restaure la base de données depuis un fichier de sauvegarde
+
+Le module `config.py` contient :
+
+- Secrets en dur : `API_TOKEN`, `API_SECRET_KEY`, `DB_PASSWORD`, `JWT_SECRET`, `AWS_ACCESS_KEY_ID`, `ADMIN_PASSWORD`, `GITHUB_TOKEN`, etc.
+- Configuration de l'application : `APP_NAME`, `APP_VERSION`, `DEBUG_MODE`
+
+#### Vulnérabilités Path Traversal
+
+Le module `app/file_handler.py` est vulnérable au Path Traversal :
+
+- **Aucune validation des chemins de fichiers** : les fonctions acceptent n'importe quel chemin sans vérification
+- Permet d'écrire/lire des fichiers en dehors du répertoire prévu
+- Exemple d'abus : `"../../../etc/passwd"` peut être utilisé pour accéder à des fichiers système
+- Les chemins sont utilisés directement sans normalisation ou validation
+
+#### Exécution des tests
+
+**Tests locaux :**
+```bash
+# Exécuter tous les tests
+python3 -m pytest tests/ -v
+
+# Exécuter uniquement les tests de file_handler
+python3 -m pytest tests/test_file_handler.py -v
+
+# Exécuter avec plus de détails
+python3 -m pytest tests/test_file_handler.py -vv
+```
+
+**Tests avec Docker :**
+```bash
+# Construire l'image
+docker build -t contacts-vuln .
+
+# Exécuter tous les tests (inclut test_file_handler.py)
+docker run --rm contacts-vuln
+
+# Résultat attendu : 14 passed (5 pour database + 9 pour file_handler)
+```
+
+**Tests spécifiques :**
+```bash
+# Tester uniquement l'export JSON
+python3 -m pytest tests/test_file_handler.py::test_export_contacts_json -v
+
+# Tester la vulnérabilité Path Traversal
+python3 -m pytest tests/test_file_handler.py::test_path_traversal_vulnerability_json -v
+```
+
+**Résultats attendus :**
+- 9 tests pour `test_file_handler.py` doivent tous passer
+- Tests couvrant : export JSON/CSV, import JSON/CSV, sauvegarde/restauration, Path Traversal, base vide
 
 ### Meryem : Interface CLI et XSS/affichage
 
