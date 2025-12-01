@@ -277,8 +277,8 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
   - Condition : exécuter seulement si CI est réussi (`if: github.event.workflow_run.conclusion == 'success'`)
   - OS : `ubuntu-latest`
 
-#### Tâche 2 : Implémenter le job "build" - Checkout et Login Docker
-- Créer le job `build` dans le workflow CD :
+#### ✅ Aya :Tâche 2 : Implémenter le job "build" - Checkout et Login Docker
+- ✅ Créer le job `build` dans le workflow CD :
   - OS : `ubuntu-latest`
   - Step "checkout" avec `actions/checkout@v5`
   - Step "login" avec `docker/login-action@v3`
