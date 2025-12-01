@@ -140,13 +140,87 @@ python3 -m pytest tests/test_file_handler.py::test_path_traversal_vulnerability_
 
 ### Meryem : Interface CLI et XSS/affichage
 
-- Créer l'interface CLI principale (`app.py` ou `cli.py`)
-  - Menu interactif
-  - Commandes (ajouter, lister, rechercher, modifier, supporter)
-  - Affichage des données (vulnérable à XSS si export HTML)
-- Implémenter l'export HTML avec XSS potentiel
-- Créer les tests principaux (`tests/test_app.py`)
-- Documentation de base (README.md)
+- ✅ Créer l'interface CLI principale (`app/cli.py`)
+  - ✅ Menu interactif
+  - ✅ Commandes (ajouter, lister, rechercher, modifier, supprimer)
+  - ✅ Affichage des données (vulnérable à XSS si export HTML)
+- ✅ Implémenter l'export HTML avec XSS potentiel
+- ✅ Créer les tests principaux (`tests/test_app.py`)
+- ✅ Documentation de base (README.md)
+
+#### Structure
+
+- `app/cli.py` : interface CLI principale avec menu interactif
+- `tests/test_app.py` : tests unitaires pour l'application CLI (export HTML, fonctions CLI)
+
+#### Fonctionnalités
+
+L'interface CLI (`app/cli.py`) fournit un menu interactif avec les commandes suivantes :
+
+- **1. Ajouter un contact** : crée un nouveau contact (nom, email, téléphone, notes)
+- **2. Lister les contacts** : affiche tous les contacts de la base
+- **3. Rechercher un contact** : recherche par mot-clé (vulnérable à SQLi)
+- **4. Modifier un contact** : met à jour les informations d'un contact existant
+- **5. Supprimer un contact** : supprime un contact par son ID
+- **6. Exporter les contacts** : exporte au format JSON, CSV ou HTML
+- **7. Importer des contacts** : importe depuis un fichier JSON ou CSV
+- **8. Sauvegarde / Restauration** : sauvegarde ou restaure la base de données complète
+- **0. Quitter** : ferme l'application
+
+#### Vulnérabilité XSS (Cross-Site Scripting)
+
+Le module `app/cli.py` contient une fonction `export_contacts_html()` qui génère un fichier HTML vulnérable à XSS :
+
+- **Aucun échappement HTML** : les données utilisateur (nom, email, notes) sont injectées directement dans le HTML sans `html.escape()`
+- Si un contact contient du code JavaScript dans ses champs (ex: `<script>alert('xss')</script>`), ce code sera exécuté lors de l'ouverture du fichier HTML dans un navigateur
+- Exemple d'abus : créer un contact avec `notes = <script>alert('xss')</script>`, puis exporter en HTML et ouvrir le fichier → le script s'exécute
+
+#### Utilisation de la CLI
+
+**Lancer l'application :**
+```bash
+# Depuis le dossier du projet
+python -m app.cli
+```
+
+**Exemple de test de la vulnérabilité XSS :**
+
+1. Lancer la CLI : `python -m app.cli`
+2. Choisir l'option **1** (Ajouter un contact)
+3. Remplir les champs :
+   - Nom : `Test XSS`
+   - Email : `xss@example.com`
+   - Téléphone : `123456789`
+   - Notes : `<script>alert('XSS vulnérable!')</script>`
+4. Choisir l'option **6** (Exporter les contacts) → **3** (Export HTML)
+5. Donner un nom de fichier : `contacts.html`
+6. Ouvrir `contacts.html` dans un navigateur → une alerte JavaScript devrait s'afficher
+
+#### Exécution des tests
+
+**Tests locaux :**
+```bash
+# Exécuter tous les tests (inclut test_app.py)
+python -m pytest tests/ -v
+
+# Exécuter uniquement les tests de la CLI
+python -m pytest tests/test_app.py -v
+```
+
+**Tests avec Docker :**
+```bash
+# Construire l'image
+docker build -t contacts-vuln .
+
+# Exécuter tous les tests
+docker run --rm contacts-vuln
+
+# Résultat attendu : X passed (5 pour database + 9 pour file_handler + tests pour app)
+```
+
+**Résultats attendus :**
+- Les tests de `test_app.py` doivent passer
+- Tests couvrant : export HTML, génération de fichiers, vulnérabilité XSS
 
 ## Structure du projet
 
