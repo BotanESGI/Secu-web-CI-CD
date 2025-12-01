@@ -11,14 +11,49 @@ L'application contient intentionnellement plusieurs vulnérabilités de sécurit
 
 ### Botan : Infrastructure et base de données
 
-- Créer la structure du projet (dossiers, fichiers de base)
-- Implémenter la gestion de la base de données avec injection SQL vulnérable
-  - Connexion SQLite
-  - Fonctions CRUD (Create, Read, Update, Delete) avec requêtes SQL non paramétrées
-  - Recherche de contacts vulnérable à SQLi
-- Créer le Dockerfile (avec dépendances vulnérables)
-- Créer `requirements.txt` avec versions vulnérables (Flask, requests, etc.)
-- Tests unitaires pour la base de données (`tests/test_database.py`)
+- ✅ Créer la structure du projet (dossiers, fichiers de base)
+- ✅ Implémenter la gestion de la base de données avec injection SQL vulnérable
+  - ✅ Connexion SQLite
+  - ✅ Fonctions CRUD (Create, Read, Update, Delete) avec requêtes SQL non paramétrées
+  - ✅ Recherche de contacts vulnérable à SQLi
+- ✅ Créer le Dockerfile (avec dépendances vulnérables)
+- ✅ Créer `requirements.txt` avec versions vulnérables (Flask, requests, etc.)
+- ✅ Tests unitaires pour la base de données (`tests/test_database.py`)
+
+
+### Structure
+
+- `app/database.py` : module de gestion de la base de données SQLite.
+- `tests/test_database.py` : tests unitaires de la couche base de données.
+- `requirements.txt` : dépendances Python (versions potentiellement vulnérables).
+- `Dockerfile` : image Docker pour exécuter les tests dans un conteneur.
+
+### Fonctionnalités
+
+La base de données utilise SQLite avec une table `contacts` :
+
+- `get_connection()` : crée/retourne une connexion vers un fichier SQLite (par défaut `contacts.db`).
+- `create_contact()` : création d’un contact.
+- `get_contact()` : récupération d’un contact par son `id`.
+- `list_contacts()` : liste de tous les contacts.
+- `update_contact()` : mise à jour de certains champs d’un contact.
+- `delete_contact()` : suppression d’un contact.
+- `search_contacts()` : recherche plein texte sur `name`, `email`, `notes`.
+
+### Vulnérabilités SQL (SQL Injection)
+
+Le module `app/database.py` est vulnérable à l’injection SQL pour les besoins :
+
+- Les requêtes sont construites par **concaténation de chaînes** / f-strings (sans paramètres préparés).
+- Les valeurs utilisateur (nom, email, notes, etc.) sont injectées directement dans la requête SQL.
+- La fonction `search_contacts()` permet de tester facilement des payloads SQLi, par exemple : `"' OR 1=1 --"`.
+
+### Commandes pour tester avec Docker
+
+docker build -t contacts-vuln .Lancer les tests dans le conteneur :
+
+docker run --rm contacts-vuln
+Si tout est correct, les tests de la base de données (`tests/test_database.py`) doivent passer (`5 passed`)
 
 ### Aya : Gestion des fichiers et Path Traversal
 
