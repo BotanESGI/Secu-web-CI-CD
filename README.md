@@ -210,8 +210,8 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
   - Permissions : `contents: read`, `security-events: write`, `actions: read`
   - OS : `ubuntu-latest` pour tous les jobs
 
-#### Tâche 2 : Implémenter le job "test" - Configuration matrix et setup
-- Créer le job `test` avec :
+#### Botan: Tâche 2 : Implémenter le job "test" - Configuration matrix et setup
+- ✅ Créer le job `test` avec :
   - Stratégie matrix pour Python 3.8, 3.9, 3.10
   - Step "checkout" avec `actions/checkout@v5`
   - Step "Python ${{ matrix.python-version }}" avec `actions/setup-python@v6`
@@ -232,8 +232,8 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
 
 ### Personne 2 : Pipeline CI - Flake8 et Trivy Scan (4 tâches)
 
-#### Tâche 1 : Implémenter le step flake8 (premier run)
-- Step "flake8" - Premier run dans le job "test" :
+#### Botan: Tâche 1 : Implémenter le step flake8 (premier run)
+- ✅ Step "flake8" - Premier run dans le job "test" :
   - Commande : `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics`
   - Exécuter sur le répertoire courant (`.`)
   - Compter le nombre d'erreurs
@@ -241,13 +241,25 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
   - Afficher le source des erreurs
   - Afficher les statistiques
 
-#### Tâche 2 : Implémenter le step flake8 (deuxième run)
-- Step "flake8" - Deuxième run dans le job "test" :
+#### Botan: Tâche 2 : Implémenter le step flake8 (deuxième run)
+- ✅ Step "flake8" - Deuxième run dans le job "test" :
   - Commande : `flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics`
   - Exécuter sur le répertoire courant (`.`)
   - Compter le nombre d'erreurs
   - Retourner "0" même avec des erreurs (`--exit-zero`)
   - Afficher les statistiques
+
+### Résumé de l'implémentation actuelle du workflow CI
+
+Le workflow `CI` est défini dans `.github/workflows/ci.yml` et contient :
+- Un **job `test`** exécuté sur `ubuntu-latest` avec une **stratégie de matrice** pour Python `3.8`, `3.9` et `3.10`.
+- Un step **`checkout`** (`actions/checkout@v5`) pour récupérer le code.
+- Un step **`Python ${{ matrix.python-version }}`** (`actions/setup-python@v6`) pour installer la version de Python de la matrice.
+- Un step **`dependencies`** qui met à jour `pip` et installe `flake8` et `pytest`.
+- Un step **`flake8`** qui exécute deux runs :
+  - 1er run : `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics`
+  - 2e run : `flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics`
+- Un step **`pytest`** qui lance `pytest tests/` sur l'ensemble des tests du projet.
 
 #### Tâche 3 : Implémenter le job "trivy-scan"
 - Créer le job `trivy-scan` dans le workflow CI :
