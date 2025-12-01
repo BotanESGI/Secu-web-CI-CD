@@ -198,4 +198,154 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
 - **Secrets en dur** : Tokens et mots de passe stockés directement dans le code
 - **Dépendances vulnérables** : Versions obsolètes de bibliothèques dans `requirements.txt`
 
+## Répartition des tâches CI/CD
+
+### Personne 1 : Pipeline CI - Structure et Job "test"
+
+#### Tâche 1 : Créer la structure du workflow CI
+- Créer le fichier `.github/workflows/ci.yml`
+- Configurer le workflow de base :
+  - Nom : "CI"
+  - Triggers : `push` sur `main`/`master` + trigger manuel (`workflow_dispatch`)
+  - Permissions : `contents: read`, `security-events: write`, `actions: read`
+  - OS : `ubuntu-latest` pour tous les jobs
+
+#### Tâche 2 : Implémenter le job "test" - Configuration matrix et setup
+- Créer le job `test` avec :
+  - Stratégie matrix pour Python 3.8, 3.9, 3.10
+  - Step "checkout" avec `actions/checkout@v5`
+  - Step "Python ${{ matrix.python-version }}" avec `actions/setup-python@v6`
+  - Step "dependencies" : 
+    - Upgrade pip : `python -m pip install --upgrade pip`
+    - Installer `flake8` et `pytest`
+
+#### Tâche 3 : Implémenter le step pytest
+- Step "pytest" qui exécute les tests sur le répertoire `tests/`
+- Commande : `pytest tests/`
+- Vérifier que les tests passent sur les 3 versions de Python (3.8, 3.9, 3.10)
+
+#### Tâche 4 : Tester et valider le job "test"
+- Pousser le code sur GitHub
+- Vérifier que le workflow CI se déclenche
+- Vérifier que le job "test" passe sur les 3 versions de Python
+- Documenter les résultats
+
+### Personne 2 : Pipeline CI - Flake8 et Trivy Scan (4 tâches)
+
+#### Tâche 1 : Implémenter le step flake8 (premier run)
+- Step "flake8" - Premier run dans le job "test" :
+  - Commande : `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics`
+  - Exécuter sur le répertoire courant (`.`)
+  - Compter le nombre d'erreurs
+  - Sélectionner uniquement les erreurs E9, F63, F7, F82
+  - Afficher le source des erreurs
+  - Afficher les statistiques
+
+#### Tâche 2 : Implémenter le step flake8 (deuxième run)
+- Step "flake8" - Deuxième run dans le job "test" :
+  - Commande : `flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics`
+  - Exécuter sur le répertoire courant (`.`)
+  - Compter le nombre d'erreurs
+  - Retourner "0" même avec des erreurs (`--exit-zero`)
+  - Afficher les statistiques
+
+#### Tâche 3 : Implémenter le job "trivy-scan"
+- Créer le job `trivy-scan` dans le workflow CI :
+  - OS : `ubuntu-latest`
+  - Step "checkout" avec `actions/checkout@v5`
+  - Step "trivy FS mode" avec `aquasecurity/trivy-action@0.33.1`
+    - Scan type : filesystem (`scan-type: 'fs'`)
+    - Format : SARIF
+    - Nom du fichier : `results.sarif`
+    - Critères : `severity: 'CRITICAL,HIGH'`
+  - Step "upload" avec `github/codeql-action/upload-sarif@v4`
+    - Uploader le fichier `results.sarif`
+
+#### Tâche 4 : Tester et valider les scans
+- Vérifier que flake8 fonctionne correctement (2 runs)
+- Vérifier que Trivy détecte les vulnérabilités dans le code
+- Vérifier que le rapport SARIF est uploadé sur GitHub Security
+- Vérifier l'affichage dans l'onglet Security du repository
+
+### Personne 3 : Pipeline CD et Documentation (4 tâches)
+
+#### Tâche 1 : Créer le workflow CD
+- Créer le fichier `.github/workflows/cd.yml`
+- Configurer le workflow :
+  - Nom : "CD"
+  - Trigger : `workflow_run` quand le workflow "CI" est complété
+  - Condition : exécuter seulement si CI est réussi (`if: github.event.workflow_run.conclusion == 'success'`)
+  - OS : `ubuntu-latest`
+
+#### Tâche 2 : Implémenter le job "build" - Checkout et Login Docker
+- Créer le job `build` dans le workflow CD :
+  - OS : `ubuntu-latest`
+  - Step "checkout" avec `actions/checkout@v5`
+  - Step "login" avec `docker/login-action@v3`
+    - Utiliser les secrets : 
+      - `username: ${{ secrets.DOCKER_USERNAME }}`
+      - `password: ${{ secrets.DOCKER_PASSWORD }}`
+
+#### Tâche 3 : Implémenter le step build and push Docker
+- Step "build and push" avec `docker/build-push-action@v6` :
+  - ID : `id: push`
+  - Context : répertoire courant (`.`)
+  - Dockerfile : `Dockerfile` (celui fourni)
+  - Push : `push: true`
+  - Tags : `tags: username/xxx:latest` (remplacer par votre username Docker Hub)
+  - Attention : le format doit être exactement `username/nom-image:latest`
+
+#### Tâche 4 : Documentation, secrets et tests finaux
+- Configurer les secrets GitHub :
+  - Aller dans Settings → Secrets and variables → Actions
+  - Créer `DOCKER_USERNAME` : votre nom d'utilisateur Docker Hub
+  - Créer `DOCKER_PASSWORD` : votre Personal Access Token Docker Hub (avec permissions Read & Write)
+- Créer le fichier de soumission `.md` avec :
+  - URL du repository GitHub public
+  - Screenshot du pipeline CI qui passe (tous les jobs)
+  - Screenshot du pipeline CD qui passe
+  - Screenshot du repository Docker Hub montrant l'image poussée
+  - Tous les fichiers créés (`.github/workflows/ci.yml` et `cd.yml`) en blocs de code
+- Tester le pipeline complet end-to-end :
+  - Push sur GitHub → CI se déclenche → CD se déclenche → Image sur Docker Hub
+
+
+### Ordre d'exécution suggéré
+
+1. **Personne 1** commence : crée `.github/workflows/ci.yml` avec la structure et le job "test"
+2. **Personne 2** continue : ajoute les steps flake8 et le job "trivy-scan" dans `ci.yml`
+3. **Personne 3** finalise : crée `.github/workflows/cd.yml` et la documentation
+
+### Points d'attention importants
+
+**Pour Personne 1 :**
+- Vérifier que la matrix Python fonctionne (3.8, 3.9, 3.10)
+- Le step pytest doit exécuter `pytest tests/`
+
+**Pour Personne 2 :**
+- Les deux runs flake8 doivent être dans le même job "test"
+- Vérifier les codes d'erreur E9, F63, F7, F82 (chercher leur signification)
+- Le format SARIF doit être exactement `results.sarif`
+
+**Pour Personne 3 :**
+- Le trigger `workflow_run` doit référencer le workflow "CI" par son nom
+- Les secrets Docker Hub doivent être créés AVANT de tester le CD
+- Le tag Docker doit être au format exact : `username/nom-image:latest` (pas `username/xxx:latest`)
+
+### Commandes de test utiles
+
+**Tester localement (si possible) :**
+```bash
+# Tester flake8
+flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+# Tester pytest
+pytest tests/ -v
+```
+
+**Vérifier sur GitHub :**
+- Onglet "Actions" : voir les workflows qui s'exécutent
+- Onglet "Security" : voir les résultats de Trivy
+- Docker Hub : vérifier que l'image est bien poussée
+
 
