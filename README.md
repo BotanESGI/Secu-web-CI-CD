@@ -140,13 +140,19 @@ python3 -m pytest tests/test_file_handler.py::test_path_traversal_vulnerability_
 
 ### Meryem : Interface CLI et XSS/affichage
 
-- Créer l'interface CLI principale (`app.py` ou `cli.py`)
-  - Menu interactif
-  - Commandes (ajouter, lister, rechercher, modifier, supporter)
-  - Affichage des données (vulnérable à XSS si export HTML)
-- Implémenter l'export HTML avec XSS potentiel
-- Créer les tests principaux (`tests/test_app.py`)
-- Documentation de base (README.md)
+- ✅ Créer l'interface CLI principale (`app/cli.py`)
+  - Menu interactif en ligne de commande
+  - Commandes : ajouter, lister, rechercher, modifier, supprimer
+- ✅ Affichage des données et export HTML vulnérable à XSS
+  - Fonction `export_contacts_html(output_path)` dans `app/cli.py`
+  - Les champs utilisateur (nom, email, notes, etc.) sont insérés directement dans le HTML
+  - Exemple : si un contact a pour notes `<script>alert('xss')</script>`, le script s'exécute dans le navigateur
+- ✅ Implémenter l'export HTML avec XSS potentiel
+- ✅ Créer les tests principaux (`tests/test_app.py`)
+  - Test de création du fichier HTML et de la présence des données + payload XSS
+  - Test que `handle_list_contacts()` ne plante pas avec une base vide
+- ✅ Documentation de base (README.md)
+  - Cette section décrit le fonctionnement de la CLI et de l'export HTML
 
 ## Structure du projet
 
@@ -177,9 +183,38 @@ contact-manager/
 ## Utilisation
 
 ```bash
-# Lancer l'application CLI
-python app/cli.py
+# Lancer l'application CLI (recommandé)
+python -m app.cli
+
+# Ancienne forme possible (peut poser des problèmes d'import selon l'environnement)
+# python app/cli.py
 ```
+
+### Exemple d'utilisation de la CLI
+
+- Lancer la CLI : `python -m app.cli`
+- Utiliser le menu :
+  - `1` : Ajouter un contact (nom, email, téléphone, notes)
+  - `2` : Lister les contacts
+  - `3` : Rechercher un contact par mot-clé
+  - `4` : Modifier un contact existant
+  - `5` : Supprimer un contact
+  - `6` : Exporter les contacts (JSON, CSV, HTML)
+  - `7` : Importer les contacts (JSON, CSV)
+  - `8` : Sauvegarder / restaurer les contacts (backup)
+
+### Démonstration de la XSS via export HTML
+
+1. Lancer la CLI : `python -m app.cli`
+2. Choisir `1` (Ajouter un contact) et créer un contact avec par exemple :
+   - Nom : `Test XSS`
+   - Email : `xss@example.com`
+   - Téléphone : `0123456789`
+   - Notes : `<script>alert('xss')</script>`
+3. Revenir au menu, choisir `6` (Exporter les contacts), puis `3` (Export HTML)
+4. Entrer un chemin de sortie, par exemple : `contacts.html`
+5. Ouvrir le fichier `contacts.html` dans un navigateur
+6. Le navigateur exécute le script contenu dans les notes → démonstration de la vulnérabilité XSS
 
 ## Fonctionnalités
 
