@@ -372,8 +372,8 @@ Le workflow `CI` est défini dans `.github/workflows/ci.yml` et contient :
       - `username: ${{ secrets.DOCKER_USERNAME }}`
       - `password: ${{ secrets.DOCKER_PASSWORD }}`
 
-#### Tâche 3 : Implémenter le step build and push Docker
-- Step "build and push" avec `docker/build-push-action@v6` :
+#### Tâche 3Meryem : Implémenter le step build and push Docker
+- ✅Step "build and push" avec `docker/build-push-action@v6` :
   - ID : `id: push`
   - Context : répertoire courant (`.`)
   - Dockerfile : `Dockerfile` (celui fourni)
