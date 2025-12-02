@@ -355,7 +355,7 @@ Le workflow `CI` est défini dans `.github/workflows/ci.yml` et contient :
 
 ### Pipeline CD et Documentation (4 tâches)
 
-#### ✅ Aya : Tâche 1 : Créer le workflow CD
+#### ✅ Meryem : Tâche 1 : Créer le workflow CD
 - ✅ Créer le fichier `.github/workflows/cd.yml`
 - ✅ Configurer le workflow :
   - Nom : "CD"
