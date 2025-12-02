@@ -315,7 +315,7 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
   - Afficher le source des erreurs
   - Afficher les statistiques
 
-#### Botan: Tâche 2 : Implémenter le step flake8 (deuxième run)
+#### Meryem: Tâche 2 : Implémenter le step flake8 (deuxième run)
 - ✅ Step "flake8" - Deuxième run dans le job "test" :
   - Commande : `flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics`
   - Exécuter sur le répertoire courant (`.`)
