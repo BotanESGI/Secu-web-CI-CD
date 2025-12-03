@@ -24,10 +24,10 @@
 ../../../etc/passwd%00.png
 
 ### **Screenshot de la requête modifiée dans Burp Suite :**
-![img.png](img_1.png)
+![img.png](img-challenges-1-4/img_1.png)
 
 ### **Screenshot de la réponse confirmant l’exploitation :**
-![img.png](img_2.png)
+![img.png](img-challenges-1-4/img_2.png)
 
 ---
 
@@ -87,25 +87,25 @@ https://portswigger.net/web-security/file-path-traversal#how-to-prevent-a-path-t
 ### 🔍 Étapes de découverte de la vulnérabilité
 
 1. Dans la page de connexion, j’observe un paramètre `inc` dans l’URL qui inclut dynamiquement des fichiers (`?inc=login.php`).  
-   ![img.png](img.png)
+   ![img.png](img-challenges-1-4/img.png)
 2. Je teste l’injection de `?inc=/etc/passwd`, mais cela ne fonctionne pas : la requête est filtrée.  
-   ![img_7.png](img_7.png)
+   ![img_7.png](img-challenges-1-4/img_7.png)
 3. J’utilise alors les **PHP filters**, notamment le wrapper `php://filter`, qui permet de lire le code source en Base64.  
-   ![img_3.png](img_3.png)
+   ![img_3.png](img-challenges-1-4/img_3.png)
 4. Maintenant que j’ai récupéré le code source encodé en Base64, je le décode pour pouvoir le lire.  
-   ![img_4.png](img_4.png)
+   ![img_4.png](img-challenges-1-4/img_4.png)
 5. Dans le code, on aperçoit la ligne `include("config.php");`. Je reproduis donc la même étape pour récupérer le fichier `config.php`.  
-   ![img_8.png](img_8.png)  
-   ![img_5.png](img_5.png)
+   ![img_8.png](img-challenges-1-4/img_8.png)  
+   ![img_5.png](img-challenges-1-4/img_5.png)
 6. Je récupère les identifiants de l’administrateur et je peux alors me connecter.  
-   ![img_6.png](img_6.png)
+   ![img_6.png](img-challenges-1-4/img_6.png)
 
 ## 📸 Payload utilisé + Screenshot
 
 php://filter/convert.base64-encode/resource=login.php
-![img_3.png](img_3.png)
+![img_3.png](img-challenges-1-4/img_3.png)
 php://filter/convert.base64-encode/resource=config.php
-![img_8.png](img_8.png)
+![img_8.png](img-challenges-1-4/img_8.png)
 
 ## 🛡️ Recommandations pour sécuriser cette vulnérabilité
 
@@ -151,23 +151,23 @@ https://tcm-sec.com/local-file-inclusion-a-practical-guide/
 
 1. J'arrive sur la page d'accueil, où deux boutons sont disponibles : **Login** et **Register**.  
    Je me crée donc un compte.  
-   ![img_9.png](img_9.png)
+   ![img_9.png](img-challenges-1-4/img_9.png)
 
 2. Ensuite, je me connecte avec le compte que je viens de créer. J'aperçois une page **Profile** (on voit que mon compte n'est pas activé).  
-   ![img_10.png](img_10.png)
+   ![img_10.png](img-challenges-1-4/img_10.png)
 
 3. Je remarque un champ caché nommé `token`, il s'agit d'un **jeton CSRF**.  
-   ![img_11.png](img_11.png)
+   ![img_11.png](img-challenges-1-4/img_11.png)
 
 4. À chaque actualisation de la page, le token change. Je n'aperçois aucun code côté client lié à la génération du token CSRF, donc j'en déduis qu'il est généré côté serveur.
 
 5. Le but est donc d’essayer **de récupérer le jeton CSRF de l’administrateur** afin de pouvoir **activer mon propre compte**.
 
 6. Je passe par une faille XSS pour injecter du JavaScript dans l’onglet **Contact** pour que lorsque que l'admin (robot-admin) va consulter le message, le script va s’exécuter dans **son** navigateur et avec **ses** droits.
-![img_13.png](img_12.png)
+![img_13.png](img-challenges-1-4/img_12.png)
 
 7. J'attends un peu que le robot passe et c'est bon mon compte est activé :
-![img_13.png](img_13.png)
+![img_13.png](img-challenges-1-4/img_13.png)
 
 ## 📸 Payload utilisé + Screenshot
 
@@ -189,7 +189,7 @@ https://tcm-sec.com/local-file-inclusion-a-practical-guide/
     document.csrf.submit();
 </script>
 ```
-![img_12.png](img_12.png)
+![img_12.png](img-challenges-1-4/img_12.png)
 
 ## 🛡️ Recommandations pour sécuriser cette vulnérabilité
 
@@ -275,14 +275,14 @@ Comme l’attaque repose *sur l’injection de JavaScript dans le formulaire de 
 ## 🔍 Étapes de découverte de la vulnérabilité
 
 Je me connecte au **premier compte utilisateur** fourni dans l’énoncé du lab.  
-![img_14.png](img_14.png)
+![img_14.png](img-challenges-1-4/img_14.png)
 
 Une fois connecté, j’accède à la fonctionnalité permettant de modifier l’adresse e-mail et j’entre une adresse e-mail.  
 J’active ensuite **Intercept On** dans Burp Suite afin d’observer les requêtes générées lors de cette action.
 
 Je vois alors la requête envoyée pour changer l’adresse e-mail, dans laquelle apparaît le jeton CSRF. Pour éviter de modifier mon adresse e-mail, je **drop** la requête.
 
-![img_15.png](img_15.png)
+![img_15.png](img-challenges-1-4/img_15.png)
 
 J’ouvre une fenêtre en **navigation privée** et me connecte au **second compte** fourni par le challenge, puis je fais exactement la même manipulation :
 - naviguer vers le formulaire de changement d’e-mail
@@ -291,18 +291,18 @@ J’ouvre une fenêtre en **navigation privée** et me connecte au **second comp
 - récupérer le jeton CSRF
 - **drop** la requête
 
-![img_16.png](img_16.png)  
-![img_17.png](img_17.png)
+![img_16.png](img-challenges-1-4/img_16.png)  
+![img_17.png](img-challenges-1-4/img_17.png)
 
 De retour sur le premier compte, j’essaie maintenant de changer l’adresse e-mail en utilisant le jeton CSRF provenant du second compte afin de vérifier si le jeton est lié à la session de l’utilisateur.  
 La requête est acceptée, donc j’en déduis que le jeton **n’est pas lié à la session utilisateur**.
 
-![img_18.png](img_18.png)
+![img_18.png](img-challenges-1-4/img_18.png)
 
 Enfin, je retourne sur le second compte pour tenter une nouvelle modification d’adresse e-mail avec une adresse unique afin de générer un nouveau jeton CSRF.  
 Je le récupère puis je **drop** la requête.
 
-![img_19.png](img_19.png)
+![img_19.png](img-challenges-1-4/img_19.png)
 
 Je crée ensuite une page HTML malveillante (PoC) que la victime va charger et je l’héberge dans l’onglet « Exploit Server » du lab, en y mettant le jeton CSRF que je viens de récupérer.
 
@@ -311,7 +311,7 @@ Enfin, je l’envoie à la victime via le bouton **« Deliver exploit to victim 
 Une fois l’exploit envoyé, la victime charge automatiquement la page malveillante. Le formulaire se soumet dans son navigateur en utilisant le jeton CSRF que j’ai récupéré, ce qui modifie son adresse e-mail sans aucune interaction de sa part.
 
 
-![img_20.png](img_20.png)
+![img_20.png](img-challenges-1-4/img_20.png)
 
 ## 📸 Payload utilisé + Screenshot
 ```html
@@ -330,7 +330,7 @@ Une fois l’exploit envoyé, la victime charge automatiquement la page malveill
 </html>
 ```
 
-![img_21.png](img_21.png)
+![img_21.png](img-challenges-1-4/img_21.png)
 
 # 🛡️ Recommandations pour sécuriser cette vulnérabilité
 
