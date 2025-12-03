@@ -463,6 +463,32 @@ Cette technique est appelée :\
 
 ------------------------------------------------------------------------
 
+
+## Recommandation :
+- Utiliser des requêtes préparées
+Toutes les requêtes SQL doivent être préparées (prepared statements) pour éviter que les entrées utilisateur soient interprétées comme du SQL.
+- Échapper strictement les paramètres dans ORDER BY
+`ORDER BY` ne supporte pas les placeholders dans certains frameworks →
+Il faut utiliser une whitelist :
+```
+$allowed = ['ASC', 'DESC'];
+if (!in_array($_GET['order'], $allowed)) {
+    $order = 'ASC';
+}
+```
+
+- Ne jamais afficher d’erreurs SQL en production
+L’erreur SQL est ce qui permet l’extraction du mot de passe.
+→ Activer un message générique côté utilisateur.
+→ Journaliser l’erreur côté serveur uniquement.
+
+- Principes de sécurité supplémentaires
+Limiter les permissions du compte SQL (SELECT strict).
+Mettre un WAF ou un parser d’entrée.
+Utiliser ORM ou Query Builder avec sécurisation auto.
+
+------------------------------------------------------------------------
+
 # Étapes de l'exploitation
 
 ## 1. Détection de la fonctionnalité vulnérable
@@ -605,6 +631,17 @@ Le contenu de la page contents est désormais visible :
 
 <img width="2940" height="346" alt="Capture d’écran 2025-12-03 à 15 09 20" src="https://github.com/user-attachments/assets/1bae8468-e4ae-49e3-84fc-0f305d617fc7" />
 
+------------------------------------------------------------------------
+
+
+# Références
+- OWASP SQL Injection Prevention Cheat Sheet
+- OWASP Error Handling Cheat Sheet
+- PortSwigger: Error-based SQL Injection
+- PayloadAllTheThings – SQL Injection
+
+
+------------------------------------------------------------------------
 
 
 # Challenge 8 --- Command injection — Filter bypass
@@ -616,6 +653,33 @@ L’interface expose un paramètre `ip` qui est utilisé pour un `ping`. Le but 
 ## 2. Vulnérabilité : Command injection
 La *command injection* survient lorsque l’application passe des données contrôlées par l’utilisateur à un interpréteur de commandes (shell) sans les neutraliser correctement. 
 L’attaquant peut alors insérer des séparateurs/commandes qui seront interprétés et exécutés.
+
+## Recommandations de sécurité
+- Ne jamais concaténer l’input utilisateur dans une commande shell
+Exemple vulnérable :
+```
+system("ping -c 2 " . $_GET['ip']);
+```
+- Solution recommandée :
+Utiliser ***escapeshellarg()*** ou ***escapeshellcmd()***
+Ou supprimer l’utilisation du shell :
+```
+$ip = filter_var($_GET['ip'], FILTER_VALIDATE_IP);
+if ($ip) {
+    exec("/bin/ping -c 2 $ip", $output, $status);
+}
+```
+- Mettre en place une validation stricte
+IP uniquement : regex stricte
+Aucune autorisation d'autres caractères ( ; | & %0a etc.)
+- Désactiver les wrappers dangereux
+Désactiver les fonctions système si elles ne sont pas nécessaires :
+system, exec, shell_exec, passthru.
+- Désactiver l’interprétation de newline via URL decoding
+Le bypass %0A a été possible car le serveur décodait les caractères spéciaux avant d'appeler le shell.
+- Utiliser un mécanisme sandbox ou isolate
+→ limitation des effets en cas d’injection.
+
 
 ### Contexte technique probable
 Le serveur exécute quelque chose du type :
@@ -733,6 +797,13 @@ Payload final que tu as utilisé :
 <img width="2934" height="1406" alt="Capture d’écran 2025-12-03 à 22 25 03" src="https://github.com/user-attachments/assets/a01e5330-148b-4116-9f87-a8d1a5a2badf" />
 
 
+### Références
+- OWASP Command Injection Cheat Sheet
+- PayloadAllTheThings – Command Injection
+- PortSwigger: OS Command Injection
+- Mitre CWE-78 (Improper Command Execution)
+
+
 # Challenge 11 Rootme##API — Mass Assignment
 
 L’objectif du laboratoire est d’auditer une petite API.
@@ -848,6 +919,22 @@ Nouvelle vérification :
 Il suffit maintenant d’appeler `/flag`.
 
 <img width="1380" height="508" alt="Capture d’écran 2025-12-03 à 23 55 36" src="https://github.com/user-attachments/assets/eba4c1f4-0472-4f68-934d-11d2c1348241" />
+
+### Références :
+- OWASP API Security Top 10 – API4:2023 (Broken Access Control)
+- OWASP REST Security Cheat Sheet
+- Auth0: Prevent Mass Assignment Vulnerabilities
+- PortSwigger – Mass Assignment Academy Lab
+
+
+### Recommandations :
+- Bloquer totalement PUT pour les utilisateurs normaux.
+- Implémenter un contrôle strict des rôles :
+```
+if user.status != 'admin':
+    deny()
+```
+- Ne jamais permettre de modifier un champ sensible (status, role, isAdmin) via une API publique.
 
 
 
