@@ -733,6 +733,125 @@ Payload final que tu as utilisé :
 <img width="2934" height="1406" alt="Capture d’écran 2025-12-03 à 22 25 03" src="https://github.com/user-attachments/assets/a01e5330-148b-4116-9f87-a8d1a5a2badf" />
 
 
+# Challenge 11 Rootme##API — Mass Assignment
+
+L’objectif du laboratoire est d’auditer une petite API.
+Le développeur dit avoir corrigé la faille précédente et avoir ajouté un rôle administrateur inaccessible aux utilisateurs normaux.
+
+On dispose des routes suivantes :
+- /signup
+- /login
+- /user
+- /note
+- /flag (réservée à l’admin
+
+→ Le but final : devenir admin pour accéder au flag.
+
+### Vulnérabilité 
+La faille est une IDOR via HTTP Method Manipulation.
+- La logique vulnérable :
+L’API autorise `PUT`, mais ne contrôle pas le rôle.
+Elle permet à n’importe quel utilisateur authentifié de modifier sa propre structure JSON, y compris son rôle.
+Aucune validation côté serveur : pas de check isAdmin.
+- Ce type d’erreur se nomme :
+Insecure Direct Object Reference (IDOR)
+Privilege Escalation via Unprotected PUT method
+Broken Access Control
+
+### Phase d'observation
+
+Après avoir lancé le challenge, nous observons l’interface utilisateur.
+Nous interceptons ensuite les requêtes via Burp Suite, puis envoyons chaque endpoint dans Repeater afin d’analyser les réponses.
+Les endpoints `/signup` et `/login` se comportent normalement.
+Le comportement intéressant se trouve dans :
+- /user
+- /note
+- /flag
+
+  Exemple de réponse de la page /flag :
+  <img width="1380" height="598" alt="Capture d’écran 2025-12-03 à 23 38 51" src="https://github.com/user-attachments/assets/8a658aef-9691-46a1-9b82-e886b6c4ca53" />
+
+Dans la page `/user`, nous observons notre statut en JSON :
+``
+{
+  "user": "xx",
+  "status": "guest"
+}
+``
+Ce champ `status` semble potentiellement modifiable.
+
+### Test des différentes méthodes HTTP
+Une technique classique en API pentest consiste à tester les méthodes HTTP non prévues.
+## Test 1 — Envoyer un POST au lieu du GET
+On modifie la requête de `/user` pour utiliser **POST**.
+Réponse :
+``
+{"error":"Method Not Allowed"}
+Allowed methods: PUT, GET, HEAD, OPTIONS
+``
+→ l’API révèle qu’elle accepte PUT.
+
+- `PUT` sert à mettre à jour un objet distant.
+- Contrairement à GET, HEAD ou OPTIONS, il modifie les données.
+- L’API nous dit qu’elle attend probablement un contenu JSON.
+- Donc si le statut de l’utilisateur existe dans la base…
+  → Nous pouvons peut-être le modifier.
+
+ ### Envoi d’un PUT avec JSON
+- Dans Burp :
+Changer la méthode : `PUT`
+Ajouter l’en-tête :
+```
+Content-Type: application/json
+```
+Envoyer un corps JSON vide d’abord :
+```
+{}
+```
+→ Réponse : l’API accepte le JSON → aucune erreur de parsing.
+<img width="1380" height="410" alt="Capture d’écran 2025-12-03 à 23 47 58" src="https://github.com/user-attachments/assets/38d552f6-6659-4dbf-8f6c-fbe9f5e219a8" />
+
+### Hypothèse d’exploitation
+Nous avons observé plus tôt que le status était :
+` "status": "guest" `
+→ L’idée : envoyer un `PUT` pour remplacer le status.
+<img width="1380" height="520" alt="Capture d’écran 2025-12-03 à 23 49 54" src="https://github.com/user-attachments/assets/564a5c8f-8173-4c92-b037-fb526dea9563" />
+
+Ensuite, on envoie un **GET** sur `/user` pour vérifier.
+Réponse :
+```
+{
+  "user": "xx",
+  "status": "ccc"
+}
+```
+→ ***SUCCESS*** ! Le rôle a bien été modifié.
+<img width="1380" height="520" alt="Capture d’écran 2025-12-03 à 23 51 54" src="https://github.com/user-attachments/assets/0677eee9-246e-41fb-965e-989b8a31cf4f" />
+
+Payload ***PUT*** final :
+```
+{ "status": "admin" }
+```
+Nouvelle vérification :
+```
+{
+  "user": "xx",
+  "status": "admin"
+}
+```
+
+<img width="1380" height="548" alt="Capture d’écran 2025-12-03 à 23 53 06" src="https://github.com/user-attachments/assets/b47f66ec-38d8-4d4c-bb09-d5b13a2408c4" />
+
+→ Nous avons maintenant les privilèges administrateur.
+
+### Accès au flag
+Il suffit maintenant d’appeler `/flag`.
+
+<img width="1380" height="508" alt="Capture d’écran 2025-12-03 à 23 55 36" src="https://github.com/user-attachments/assets/eba4c1f4-0472-4f68-934d-11d2c1348241" />
+
+
+
+
 
 
   
