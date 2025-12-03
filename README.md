@@ -274,9 +274,9 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
 
 ## Répartition des tâches CI/CD
 
-### Pipeline CI - Structure et Job "test"
+### Personne 1 : Pipeline CI - Structure et Job "test"
 
-#### Aya: Tâche 1 : Créer la structure du workflow CI
+#### ✅ Tâche 1 : Créer la structure du workflow CI
 - ✅ Créer le fichier `.github/workflows/ci.yml`
 - ✅ Configurer le workflow de base :
   - Nom : "CI"
@@ -315,7 +315,7 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
   - Afficher le source des erreurs
   - Afficher les statistiques
 
-#### Botan: Tâche 2 : Implémenter le step flake8 (deuxième run)
+#### Meryem: Tâche 2 : Implémenter le step flake8 (deuxième run)
 - ✅ Step "flake8" - Deuxième run dans le job "test" :
   - Commande : `flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics`
   - Exécuter sur le répertoire courant (`.`)
@@ -355,7 +355,7 @@ Le workflow `CI` est défini dans `.github/workflows/ci.yml` et contient :
 
 ### Pipeline CD et Documentation (4 tâches)
 
-#### ✅ Aya : Tâche 1 : Créer le workflow CD
+#### ✅ Meryem : Tâche 1 : Créer le workflow CD
 - ✅ Créer le fichier `.github/workflows/cd.yml`
 - ✅ Configurer le workflow :
   - Nom : "CD"
@@ -372,8 +372,8 @@ Le workflow `CI` est défini dans `.github/workflows/ci.yml` et contient :
       - `username: ${{ secrets.DOCKER_USERNAME }}`
       - `password: ${{ secrets.DOCKER_PASSWORD }}`
 
-#### Tâche 3 : Implémenter le step build and push Docker
-- Step "build and push" avec `docker/build-push-action@v6` :
+#### Tâche 3Meryem : Implémenter le step build and push Docker
+- ✅Step "build and push" avec `docker/build-push-action@v6` :
   - ID : `id: push`
   - Context : répertoire courant (`.`)
   - Dockerfile : `Dockerfile` (celui fourni)
