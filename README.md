@@ -286,17 +286,17 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
 
 #### Botan: Tâche 2 : Implémenter le job "test" - Configuration matrix et setup
 - ✅ Créer le job `test` avec :
-  - Stratégie matrix pour Python 3.8, 3.9, 3.10
-  - Step "checkout" avec `actions/checkout@v5`
-  - Step "Python ${{ matrix.python-version }}" avec `actions/setup-python@v6`
-  - Step "dependencies" : 
-    - Upgrade pip : `python -m pip install --upgrade pip`
-    - Installer `flake8` et `pytest`
+  -  Stratégie matrix pour Python 3.8, 3.9, 3.10
+  -  Step "checkout" avec `actions/checkout@v5`
+  -  Step "Python ${{ matrix.python-version }}" avec `actions/setup-python@v6`
+  - ✅ Step "dependencies" : 
+    -  Upgrade pip : `python -m pip install --upgrade pip`
+    -  Installer `flake8` et `pytest`
 
-#### Tâche 3 : Implémenter le step pytest
-- Step "pytest" qui exécute les tests sur le répertoire `tests/`
-- Commande : `pytest tests/`
-- Vérifier que les tests passent sur les 3 versions de Python (3.8, 3.9, 3.10)
+#### Botan: Tâche 3 : Implémenter le step pytest
+- ✅ Step "pytest" qui exécute les tests sur le répertoire `tests/`
+- ✅ Commande : `pytest tests/`
+- ✅ Vérifier que les tests passent sur les 3 versions de Python (3.8, 3.9, 3.10)
 
 #### Tâche 4 : Tester et valider le job "test"
 - Pousser le code sur GitHub
@@ -381,19 +381,21 @@ Le workflow `CI` est défini dans `.github/workflows/ci.yml` et contient :
   - Tags : `tags: username/xxx:latest` (remplacer par votre username Docker Hub)
   - Attention : le format doit être exactement `username/nom-image:latest`
 
-#### Tâche 4 : Documentation, secrets et tests finaux
-- Configurer les secrets GitHub :
+#### Tâche 4 Botan: Documentation, secrets et tests finaux
+- ✅ Configurer les secrets GitHub :
   - Aller dans Settings → Secrets and variables → Actions
   - Créer `DOCKER_USERNAME` : votre nom d'utilisateur Docker Hub
   - Créer `DOCKER_PASSWORD` : votre Personal Access Token Docker Hub (avec permissions Read & Write)
-- Créer le fichier de soumission `.md` avec :
+- ✅ Créer le fichier de soumission `.md` avec :
   - URL du repository GitHub public
   - Screenshot du pipeline CI qui passe (tous les jobs)
   - Screenshot du pipeline CD qui passe
   - Screenshot du repository Docker Hub montrant l'image poussée
   - Tous les fichiers créés (`.github/workflows/ci.yml` et `cd.yml`) en blocs de code
-- Tester le pipeline complet end-to-end :
+- ✅ Tester le pipeline complet end-to-end :
   - Push sur GitHub → CI se déclenche → CD se déclenche → Image sur Docker Hub
+
+- Documentation disponible ici : [`Documentation.md`](./Documentation.md)
 
 
 ### Commandes de test utiles
