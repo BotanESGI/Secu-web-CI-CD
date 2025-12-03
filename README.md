@@ -298,11 +298,11 @@ Cette application contient intentionnellement des vulnérabilités pour les beso
 - ✅ Commande : `pytest tests/`
 - ✅ Vérifier que les tests passent sur les 3 versions de Python (3.8, 3.9, 3.10)
 
-#### Tâche 4 : Tester et valider le job "test"
-- Pousser le code sur GitHub
-- Vérifier que le workflow CI se déclenche
-- Vérifier que le job "test" passe sur les 3 versions de Python
-- Documenter les résultats
+#### Botan: Tâche : Tester et valider le job "test"
+- ✅ Pousser le code sur GitHub
+- ✅ Vérifier que le workflow CI se déclenche
+- ✅ Vérifier que le job "test" passe sur les 3 versions de Python
+- ✅ Documenter les résultats
 
 ### Pipeline CI - Flake8 et Trivy Scan (4 tâches)
 
@@ -348,10 +348,10 @@ Le workflow `CI` est défini dans `.github/workflows/ci.yml` et contient :
     - Uploader le fichier `results.sarif`
 
 #### Tâche 4 : Tester et valider les scans
-- Vérifier que flake8 fonctionne correctement (2 runs)
-- Vérifier que Trivy détecte les vulnérabilités dans le code
+- ✅ Vérifier que flake8 fonctionne correctement (2 runs)
+- ✅ Vérifier que Trivy détecte les vulnérabilités dans le code
 - Vérifier que le rapport SARIF est uploadé sur GitHub Security
-- Vérifier l'affichage dans l'onglet Security du repository
+- ✅ Vérifier l'affichage dans l'onglet Security du repository
 
 ### Pipeline CD et Documentation (4 tâches)
 
@@ -398,7 +398,7 @@ Le workflow `CI` est défini dans `.github/workflows/ci.yml` et contient :
 - Documentation disponible ici : [`Documentation.md`](./Documentation.md)
 
 
-### Commandes de test utiles
+### Commandes de test utiles 
 
 **Tester localement (si possible) :**
 ```bash
