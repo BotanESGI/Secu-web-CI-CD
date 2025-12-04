@@ -1013,6 +1013,45 @@ E5HKEGyCXQVsYaehaqeJs0AfV
 ```
 
 👉 C’est la solution du challenge.
+
+## 🛡️ Recommandations pour sécuriser cette vulnérabilité
+
+🔥 1. Ne jamais réinjecter une valeur de cookie directement dans la page
+-Les cookies sont contrôlés par l’utilisateur → ils sont NON FIABLES.
+-Toute donnée venant du client doit être traitée comme potentiellement malveillante.
+
+🔥 2. Échapper systématiquement les sorties (output encoding)
+-HTML encoding (< → &lt;, " → &quot;)
+-Attribute encoding pour les attributs value=""
+-JavaScript encoding si la donnée est injectée dans un script
+
+🔥 3. Utiliser une politique CSP (Content Security Policy)
+
+-Interdire les scripts inline (script-src 'self')
+-Empêcher les injections de scripts à même la page
+-Bloquer l’appel vers des domaines externes (exfiltration)
+
+🔥 4. Refuser les injections dans les cookies
+-Sanitize côté serveur
+-Normaliser les données avant stockage/affichage
+🔥 5. Séparer le stockage des informations de statut
+-Le status utilisateur ne doit pas être déterminé ou affiché via un cookie
+-Utiliser la session serveur (PHPSESSID, session Flask, etc.)
+
+🔥 6. Protéger les pages admin
+
+-Accès uniquement via des sessions serveur non manipulables
+-Pas de logique dépendant d’un cookie contrôlé par l’utilisateur
+## 📚 Références utilisées
+
+-OWASP – XSS Prevention Cheat Sheet
+https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
+
+-Mozilla – CSP Reference
+https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
+
+-PortSwigger – Reflected & Stored XSS
+https://portswigger.net/web-security/cross-site-scripting
 # Challenge 5:CSRF where Referer validation depends on header being present
 ## Analyse du fonctionnement normal
 Après connexion avec :
@@ -1082,7 +1121,53 @@ Puis sur Deliver to victim.
 Le serveur victime charge mon exploit → requête POST sans Referer → email modifié.
 
 🎉 Challenge résolu.
+## 🛡️ Recommandations pour sécuriser cette vulnérabilité
+🛡️ 1. Utiliser de vrais tokens CSRF synchronisés
 
+-Token stocké côté serveur + inséré dans chaque formulaire
+-Token unique par session ou par requête
+-Rejet automatique si token manquant / invalide
+
+🛡️ 2. Interdire toute requête sensible sans token CSRF
+
+-Le serveur doit obligatoirement vérifier :
+```
+CSRF token présent ?
+CSRF token valide ?
+Correspond-il à la session ?
+```
+
+🛡️ 3. Exiger un header personnalisé pour les requêtes sensibles
+
+- X-CSRF-Token
+- X-Requested-With: XMLHttpRequest
+→ Ces headers ne peuvent pas être envoyés par un site tiers, donc bloquent les CSRF.
+
+🛡️ 4. Protéger les cookies avec SameSite
+
+-SameSite=Strict ou Lax
+E-mpêche l’envoi de cookies lors de requêtes cross-site
+
+🛡️ 5. Utiliser des vérifications « defense-in-depth »
+
+-Vérifier l’origine (Origin: header) plutôt que seulement Referer
+-Bloquer les requêtes GET pour des actions sensibles
+(un changement d’email via GET est une erreur de design)
+
+🛡️ 6. Échapper toute donnée affichée (prévention XSS)
+
+-Une XSS peut contourner n'importe quelle protection CSRF → defense chaining.
+
+## 📚 Références utilisées
+
+-OWASP CSRF Prevention Cheat Sheet
+https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
+
+-PortSwigger – CSRF Academy Lab
+https://portswigger.net/web-security/csrf
+
+-MDN – SameSite Cookies Explained
+https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite
 
 ## Challenge 6 – JWT Révoqué
 Exploitation
@@ -1138,3 +1223,46 @@ Le serveur renvoie :
 
 
 ➡️ Challenge validé.
+## 🛡️ Recommandations pour sécuriser cette vulnérabilité
+🔐 1. Utiliser correctement le champ jti des JWT
+
+-Le jti (JWT ID) est un identifiant unique intégré dans les JWT.
+-La blacklist doit contenir les jti, pas le token brut.
+Cela empêche les bypass basés sur la modification de chaîne (= ajouté, padding modifié, etc.)
+
+🔐 2. Ne jamais comparer directement la chaîne entière du token
+
+-Comparer un token JWT encodé base64 est dangereux, car il peut être modifié sans casser sa structure.
+-Toujours comparer les claims internes, après décodage et validation de la signature.
+
+🔐 3. Vérifier systématiquement la signature avant toute logique
+
+-Même si le token n’est pas blacklisté, sa signature HMAC doit être vérifiée avant lecture.
+-Utiliser jwt.decode(..., verify=True) avec une clé secrète robuste.
+
+🔐 4. Implémenter une vraie gestion de session JWT
+
+-Utiliser un store serveur pour suivre les sessions actives et révoquées.
+-Définir une durée de vie courte + refresh tokens sécurisés si nécessaire.
+
+🔐 5. Éviter le stockage des JWT dans des endroits modifiables par l’utilisateur
+
+-Pas dans localStorage (susceptible au XSS)
+-Préférer cookies HttpOnly + SameSite.
+
+🔐 6. Révoquer un token sur plusieurs conditions
+
+-Rotation des signatures
+-Versionning des sessions
+-Blacklist basée sur jti, sub ou iat
+
+## 📚 Références utilisées
+
+-OWASP – JSON Web Tokens (JWT) Cheat Sheet
+https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet_for_Java.html
+
+-Auth0 – Security Best Practices for JWT
+https://auth0.com/docs/secure/tokens/json-web-tokens
+
+-RFC 7519 – JSON Web Token (JWT) Standard
+https://www.rfc-editor.org/rfc/rfc7519
